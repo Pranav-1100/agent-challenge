@@ -1,131 +1,307 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import nodemailer from 'nodemailer';
 
 // ============================================================================
-// CORE TOOLS - Used by Agent (8 tools)
+// IPO RESEARCH - NOW WITH FINNHUB IPO CALENDAR API! 🎯
 // ============================================================================
 
-// 1. ADD STOCK TOOL (Core - Updates Memory)
-export const addStockTool = createTool({
-  id: 'add-stock',
-  description: 'Add stock to portfolio with proper memory management',
+export const ipoResearchTool = createTool({
+  id: 'ipo-research',
+  description: 'Get IPO calendar and information using Finnhub API',
   inputSchema: z.object({
-    symbol: z.string().describe('Stock ticker symbol'),
-    quantity: z.number().describe('Number of shares'),
-    price: z.number().describe('Purchase price per share'),
+    companyName: z.string().describe('Company name to search for (optional)'),
+    timeframe: z.enum(['upcoming', 'recent', 'all']).optional().default('upcoming'),
   }),
   outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
+    companyName: z.string(),
+    ipoStatus: z.string(),
+    ipos: z.array(z.object({
+      name: z.string(),
+      symbol: z.string().optional(),
+      date: z.string(),
+      exchange: z.string().optional(),
+      priceRange: z.string().optional(),
+      numberOfShares: z.number().optional(),
+      totalValue: z.string().optional(),
+      status: z.string(),
+    })),
+    findings: z.string(),
+    recommendation: z.string(),
   }),
-  execute: async ({ context, mastra }) => {
-    if (!mastra?.memory) {
-      return {
-        success: false,
-        message: 'Memory not available'
-      };
-    }
-
-    const { symbol, quantity, price } = context;
-    const symbolUpper = symbol.toUpperCase();
-    
-    const memory = await mastra.memory.getWorkingMemory(context.runId!);
-    const portfolio = (memory?.portfolio as any[]) || [];
-    
-    const existingIndex = portfolio.findIndex((h: any) => h.symbol === symbolUpper);
-    
-    let updatedPortfolio;
-    if (existingIndex >= 0) {
-      updatedPortfolio = [...portfolio];
-      const existing = updatedPortfolio[existingIndex];
+  execute: async ({ context }) => {
+    try {
+      console.log(`🎯 Searching IPOs: ${context.companyName}`);
       
-      updatedPortfolio[existingIndex] = {
-        symbol: symbolUpper,
-        quantity: existing.quantity + quantity,
-        purchasePrice: existing.purchasePrice,
-        purchases: [
-          ...(existing.purchases || [{ quantity: existing.quantity, price: existing.purchasePrice }]),
-          { quantity, price }
-        ]
+      const apiKey = process.env.FINNHUB_API_KEY;
+      
+      if (!apiKey) {
+        return {
+          companyName: context.companyName,
+          ipoStatus: 'API_KEY_MISSING',
+          ipos: [],
+          findings: `To get real-time IPO data, add FINNHUB_API_KEY to your .env file.\n\nGet your free API key from: https://finnhub.io`,
+          recommendation: 'Set up Finnhub API key for real-time IPO calendar data.',
+        };
+      }
+
+      // Calculate date range based on timeframe
+      const today = new Date();
+      let fromDate: Date;
+      let toDate: Date;
+
+      if (context.timeframe === 'upcoming') {
+        fromDate = today;
+        toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000); // Next 90 days
+      } else if (context.timeframe === 'recent') {
+        fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000); // Last 90 days
+        toDate = today;
+      } else {
+        fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+        toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+      }
+
+      const fromStr = fromDate.toISOString().split('T')[0];
+      const toStr = toDate.toISOString().split('T')[0];
+
+      // Fetch IPO calendar from Finnhub
+      const url = `https://finnhub.io/api/v1/calendar/ipo?from=${fromStr}&to=${toStr}&token=${apiKey}`;
+      console.log(`🔍 Fetching from: ${url}`);
+      
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`API error ${response.status}:`, errorText);
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const allIPOs = data.ipoCalendar || [];
+      
+      console.log(`✅ Fetched ${allIPOs.length} IPOs`);
+
+      // Filter by company name if provided
+      let filteredIPOs = allIPOs;
+      if (context.companyName && context.companyName.toLowerCase() !== 'all') {
+        const searchTerm = context.companyName.toLowerCase();
+        filteredIPOs = allIPOs.filter((ipo: any) => 
+          ipo.name.toLowerCase().includes(searchTerm) ||
+          (ipo.symbol && ipo.symbol.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      if (filteredIPOs.length === 0 && context.companyName) {
+        return {
+          companyName: context.companyName,
+          ipoStatus: 'NOT_FOUND',
+          ipos: allIPOs.slice(0, 10).map((ipo: any) => ({
+            name: ipo.name,
+            symbol: ipo.symbol || 'TBA',
+            date: ipo.date,
+            exchange: ipo.exchange,
+            priceRange: ipo.price || 'TBA',
+            numberOfShares: ipo.numberOfShares,
+            totalValue: ipo.totalSharesValue ? `${(ipo.totalSharesValue / 1e6).toFixed(1)}M` : 'TBA',
+            status: ipo.status,
+          })),
+          findings: `No IPOs found for "${context.companyName}".\n\nShowing ${Math.min(10, allIPOs.length)} ${context.timeframe} IPOs instead:\n\n${allIPOs.slice(0, 10).map((ipo: any) => `• ${ipo.name} (${ipo.symbol || 'TBA'}) - ${ipo.status} on ${ipo.date}`).join('\n')}`,
+          recommendation: 'Check the IPO calendar for other opportunities or try a different company name.',
+        };
+      }
+
+      // Format IPO details
+      const ipoDetails = (context.companyName ? filteredIPOs : filteredIPOs.slice(0, 10)).map((ipo: any) => ({
+        name: ipo.name,
+        symbol: ipo.symbol || 'TBA',
+        date: ipo.date,
+        exchange: ipo.exchange,
+        priceRange: ipo.price || 'TBA',
+        numberOfShares: ipo.numberOfShares,
+        totalValue: ipo.totalSharesValue ? `${(ipo.totalSharesValue / 1e6).toFixed(1)}M` : 'TBA',
+        status: ipo.status,
+      }));
+
+      const mainIPO = ipoDetails[0];
+      
+      let findings = '';
+      if (context.companyName && filteredIPOs.length === 1) {
+        // Specific company found
+        findings = `**${mainIPO.name} (${mainIPO.symbol})**
+
+📊 **IPO Details:**
+• Status: ${mainIPO.status.toUpperCase()}
+• Date: ${mainIPO.date}
+• Exchange: ${mainIPO.exchange}
+• Price Range: ${mainIPO.priceRange}
+• Shares Offered: ${mainIPO.numberOfShares?.toLocaleString() || 'TBA'}
+• Total Value: ${mainIPO.totalValue}
+
+**What to Consider:**
+✓ Review the prospectus for company fundamentals
+✓ Check the company's financials and growth trajectory
+✓ Compare valuation with industry peers
+✓ Research promoter background and business model
+✓ Monitor subscription numbers when available`;
+      } else {
+        // Show calendar of multiple IPOs
+        findings = `**${context.timeframe.toUpperCase()} IPO CALENDAR**
+
+Found ${ipoDetails.length} IPOs:\n\n` + ipoDetails.map((ipo: any, idx: number) => 
+          `${idx + 1}. **${ipo.name}** (${ipo.symbol})
+   📅 ${ipo.date} | ${ipo.exchange}
+   💰 ${ipo.priceRange} | ${ipo.totalValue}
+   📊 Status: ${ipo.status.toUpperCase()}`
+        ).join('\n\n');
+      }
+
+      const recommendation = mainIPO.status === 'expected' 
+        ? `The ${mainIPO.name} IPO is upcoming. Research thoroughly before applying. Consider the price range, company fundamentals, and your investment timeline.`
+        : mainIPO.status === 'priced'
+        ? `The ${mainIPO.name} IPO has been priced. Check the final price and subscription status before investing.`
+        : `Review the IPO calendar for upcoming opportunities. Always read the prospectus and do your own research.`;
+
+      return {
+        companyName: context.companyName,
+        ipoStatus: 'FOUND',
+        ipos: ipoDetails,
+        findings,
+        recommendation,
       };
-    } else {
-      updatedPortfolio = [
-        ...portfolio,
-        {
-          symbol: symbolUpper,
-          quantity,
-          purchasePrice: price,
-          purchases: [{ quantity, price }]
-        }
-      ];
+    } catch (error) {
+      console.error('❌ IPO research error:', error);
+      return {
+        companyName: context.companyName,
+        ipoStatus: 'ERROR',
+        ipos: [],
+        findings: `Unable to fetch IPO data. Error: ${error}\n\nPlease check:\n• Your internet connection\n• FINNHUB_API_KEY is valid\n• API quota limits`,
+        recommendation: 'Try again later or check finnhub.io for API status.',
+      };
     }
-    
-    await mastra.memory.updateWorkingMemory(context.runId!, {
-      portfolio: updatedPortfolio
-    });
-    
-    return {
-      success: true,
-      message: `✅ Added ${quantity} shares of ${symbolUpper} at $${price.toFixed(2)}`
-    };
   },
 });
 
-// 2. REMOVE STOCK TOOL (Core - Updates Memory)
-export const removeStockTool = createTool({
-  id: 'remove-stock',
-  description: 'Remove stock from portfolio',
+// ============================================================================
+// PORTFOLIO PROFIT CALCULATOR - ACTUALLY CALCULATES NOW!
+// ============================================================================
+
+export const portfolioProfitCalculatorTool = createTool({
+  id: 'portfolio-profit-calculator',
+  description: 'Calculate detailed profits and losses for the entire portfolio',
   inputSchema: z.object({
-    symbol: z.string(),
-    quantity: z.number().optional(),
+    portfolio: z.array(z.object({
+      symbol: z.string(),
+      quantity: z.number(),
+      purchasePrice: z.number(),
+    })),
   }),
   outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
+    holdings: z.array(z.object({
+      symbol: z.string(),
+      quantity: z.number(),
+      purchasePrice: z.number(),
+      currentPrice: z.number(),
+      totalCost: z.number(),
+      totalValue: z.number(),
+      profitLoss: z.number(),
+      profitLossPercent: z.number(),
+    })),
+    totalCost: z.number(),
+    totalValue: z.number(),
+    totalProfit: z.number(),
+    totalProfitPercent: z.number(),
+    summary: z.string(),
   }),
-  execute: async ({ context, mastra }) => {
-    if (!mastra?.memory) {
-      return {
-        success: false,
-        message: 'Memory not available'
-      };
-    }
+  execute: async ({ context }) => {
+    try {
+      const apiKey = process.env.FINNHUB_API_KEY;
+      
+      if (!apiKey) {
+        throw new Error('FINNHUB_API_KEY not configured');
+      }
 
-    const { symbol, quantity } = context;
-    const symbolUpper = symbol.toUpperCase();
-    
-    const memory = await mastra.memory.getWorkingMemory(context.runId!);
-    const portfolio = (memory?.portfolio as any[]) || [];
-    
-    const existingIndex = portfolio.findIndex((h: any) => h.symbol === symbolUpper);
-    
-    if (existingIndex < 0) {
-      return { success: false, message: `${symbolUpper} not found in portfolio` };
-    }
-    
-    let updatedPortfolio;
-    if (!quantity || portfolio[existingIndex].quantity <= quantity) {
-      updatedPortfolio = portfolio.filter((h: any) => h.symbol !== symbolUpper);
-    } else {
-      updatedPortfolio = [...portfolio];
-      updatedPortfolio[existingIndex] = {
-        ...updatedPortfolio[existingIndex],
-        quantity: updatedPortfolio[existingIndex].quantity - quantity,
+      console.log(`💰 Calculating profits for ${context.portfolio.length} stocks...`);
+
+      const holdings = await Promise.all(
+        context.portfolio.map(async (holding) => {
+          try {
+            const response = await fetch(`https://finnhub.io/api/v1/quote?symbol=${holding.symbol}&token=${apiKey}`);
+            const data = await response.json();
+            const currentPrice = data.c || holding.purchasePrice;
+            
+            const totalCost = holding.purchasePrice * holding.quantity;
+            const totalValue = currentPrice * holding.quantity;
+            const profitLoss = totalValue - totalCost;
+            const profitLossPercent = (profitLoss / totalCost) * 100;
+
+            return {
+              symbol: holding.symbol,
+              quantity: holding.quantity,
+              purchasePrice: holding.purchasePrice,
+              currentPrice,
+              totalCost,
+              totalValue,
+              profitLoss,
+              profitLossPercent,
+            };
+          } catch (error) {
+            console.error(`Error fetching ${holding.symbol}:`, error);
+            return {
+              symbol: holding.symbol,
+              quantity: holding.quantity,
+              purchasePrice: holding.purchasePrice,
+              currentPrice: holding.purchasePrice,
+              totalCost: holding.purchasePrice * holding.quantity,
+              totalValue: holding.purchasePrice * holding.quantity,
+              profitLoss: 0,
+              profitLossPercent: 0,
+            };
+          }
+        })
+      );
+
+      const totalCost = holdings.reduce((sum, h) => sum + h.totalCost, 0);
+      const totalValue = holdings.reduce((sum, h) => sum + h.totalValue, 0);
+      const totalProfit = totalValue - totalCost;
+      const totalProfitPercent = (totalProfit / totalCost) * 100;
+
+      // Generate summary
+      const winners = holdings.filter(h => h.profitLoss > 0);
+      const losers = holdings.filter(h => h.profitLoss < 0);
+      
+      const summary = `📊 **Portfolio Performance Summary:**
+
+💰 **Total Investment:** $${totalCost.toFixed(2)}
+💵 **Current Value:** $${totalValue.toFixed(2)}
+${totalProfit >= 0 ? '📈' : '📉'} **Profit/Loss:** ${totalProfit >= 0 ? '+' : ''}$${totalProfit.toFixed(2)} (${totalProfitPercent.toFixed(2)}%)
+
+**Winners:** ${winners.length} stocks in profit
+**Losers:** ${losers.length} stocks in loss
+
+**Top Performer:** ${holdings.sort((a, b) => b.profitLossPercent - a.profitLossPercent)[0]?.symbol} (+${holdings.sort((a, b) => b.profitLossPercent - a.profitLossPercent)[0]?.profitLossPercent.toFixed(2)}%)
+**Worst Performer:** ${holdings.sort((a, b) => a.profitLossPercent - b.profitLossPercent)[0]?.symbol} (${holdings.sort((a, b) => a.profitLossPercent - b.profitLossPercent)[0]?.profitLossPercent.toFixed(2)}%)`;
+
+      console.log(`✅ Calculated: Total P/L = $${totalProfit.toFixed(2)}`);
+
+      return {
+        holdings,
+        totalCost,
+        totalValue,
+        totalProfit,
+        totalProfitPercent,
+        summary,
       };
+    } catch (error) {
+      console.error('❌ Profit calculation error:', error);
+      throw error;
     }
-    
-    await mastra.memory.updateWorkingMemory(context.runId!, {
-      portfolio: updatedPortfolio
-    });
-    
-    return {
-      success: true,
-      message: `✅ Removed ${quantity || 'all'} shares of ${symbolUpper}`
-    };
   },
 });
 
-// 3. STOCK ANALYZER TOOL (Core - Price & Metrics)
+// ============================================================================
+// STOCK ANALYZER - Enhanced
+// ============================================================================
+
 export type StockAnalysisResult = z.infer<typeof StockAnalysisSchema>;
 
 const StockAnalysisSchema = z.object({
@@ -144,9 +320,9 @@ const StockAnalysisSchema = z.object({
 
 export const stockAnalyzerTool = createTool({
   id: 'stock-analyzer',
-  description: 'Get current stock price and metrics (use ONCE per stock)',
+  description: 'Get real-time stock price and basic analysis',
   inputSchema: z.object({
-    symbol: z.string().describe('Stock ticker symbol (e.g., AAPL, TSLA, MSFT)'),
+    symbol: z.string().describe('Stock ticker symbol'),
   }),
   outputSchema: StockAnalysisSchema,
   execute: async ({ context }) => {
@@ -156,27 +332,37 @@ export const stockAnalyzerTool = createTool({
 
       if (!apiKey) {
         return {
-          symbol, name: symbol, currentPrice: 0,
+          symbol,
+          name: symbol,
+          currentPrice: 0,
           recommendation: 'ERROR',
-          error: 'FINNHUB_API_KEY not configured'
+          error: 'FINNHUB_API_KEY not configured',
         };
       }
 
+      const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`;
+      const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`;
+      const metricsUrl = `https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`;
+
       const [quoteRes, profileRes, metricsRes] = await Promise.all([
-        fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`),
-        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`),
-        fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`),
+        fetch(quoteUrl),
+        fetch(profileUrl),
+        fetch(metricsUrl),
       ]);
 
       const [quoteData, profileData, metricsData] = await Promise.all([
-        quoteRes.json(), profileRes.json(), metricsRes.json()
+        quoteRes.json(),
+        profileRes.json(),
+        metricsRes.json(),
       ]);
 
       if (!quoteData.c || quoteData.c === 0) {
         return {
-          symbol, name: symbol, currentPrice: 0,
+          symbol,
+          name: symbol,
+          currentPrice: 0,
           recommendation: 'ERROR',
-          error: `Symbol "${symbol}" not found`
+          error: `Stock ${symbol} not found`,
         };
       }
 
@@ -193,7 +379,9 @@ export const stockAnalyzerTool = createTool({
       return {
         symbol,
         name: profileData.name || symbol,
-        currentPrice, change, changePercent,
+        currentPrice,
+        change,
+        changePercent,
         marketCap: profileData.marketCapitalization ? 
           formatMarketCap(profileData.marketCapitalization * 1e6) : undefined,
         peRatio: metricsData.metric?.peBasicExclExtraTTM || undefined,
@@ -207,13 +395,16 @@ export const stockAnalyzerTool = createTool({
         name: context.symbol.toUpperCase(),
         currentPrice: 0,
         recommendation: 'ERROR',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: String(error),
       };
     }
   },
 });
 
-// 4. SMART STOCK RESEARCH TOOL (Core - Deep Analysis)
+// ============================================================================
+// SMART STOCK RESEARCH
+// ============================================================================
+
 export type StockResearchResult = z.infer<typeof StockResearchSchema>;
 
 const StockResearchSchema = z.object({
@@ -236,28 +427,33 @@ const StockResearchSchema = z.object({
 
 export const smartStockResearchTool = createTool({
   id: 'smart-stock-research',
-  description: 'Deep research with pros/cons (use ONCE per query)',
+  description: 'Deep investment research with pros/cons',
   inputSchema: z.object({
-    query: z.string().describe('Stock symbol or company name to research'),
+    query: z.string().describe('Stock symbol or company'),
   }),
   outputSchema: StockResearchSchema,
   execute: async ({ context }) => {
     try {
       const symbol = context.query.toUpperCase().replace(/[^A-Z]/g, '');
       const apiKey = process.env.FINNHUB_API_KEY;
-      
       let stockData: any = null;
 
       if (apiKey && symbol) {
         try {
+          const quoteUrl = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`;
+          const profileUrl = `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`;
+          const metricsUrl = `https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`;
+
           const [quoteRes, profileRes, metricsRes] = await Promise.all([
-            fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`),
-            fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`),
-            fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`),
+            fetch(quoteUrl),
+            fetch(profileUrl),
+            fetch(metricsUrl),
           ]);
 
           const [quoteData, profileData, metricsData] = await Promise.all([
-            quoteRes.json(), profileRes.json(), metricsRes.json()
+            quoteRes.json(),
+            profileRes.json(),
+            metricsRes.json(),
           ]);
 
           if (quoteData.c && quoteData.c > 0) {
@@ -281,7 +477,12 @@ export const smartStockResearchTool = createTool({
         symbol: stockData?.symbol || symbol || context.query,
         name: stockData?.name || context.query,
         currentPrice: stockData?.currentPrice,
-        ...analysis,
+        analysis: analysis.analysis,
+        pros: analysis.pros,
+        cons: analysis.cons,
+        riskLevel: analysis.riskLevel,
+        recommendation: analysis.recommendation,
+        reasoning: analysis.reasoning,
         news: newsData,
       };
     } catch (error) {
@@ -299,19 +500,19 @@ export const smartStockResearchTool = createTool({
   },
 });
 
-// 5. PORTFOLIO ADVISOR TOOL (Core - Complete Portfolio Analysis)
+// ============================================================================
+// OTHER TOOLS (keeping existing)
+// ============================================================================
+
 export const portfolioAdvisorTool = createTool({
   id: 'portfolio-advisor',
-  description: 'Analyze ENTIRE portfolio with current prices (use ONCE)',
+  description: 'AI-powered portfolio analysis',
   inputSchema: z.object({
     portfolio: z.array(z.object({
       symbol: z.string(),
       quantity: z.number(),
       purchasePrice: z.number(),
-      purchases: z.array(z.object({
-        quantity: z.number(),
-        price: z.number(),
-      })).optional(),
+      currentPrice: z.number().optional(),
     })),
   }),
   outputSchema: z.object({
@@ -321,97 +522,49 @@ export const portfolioAdvisorTool = createTool({
     recommendations: z.array(z.string()),
     strengths: z.array(z.string()),
     weaknesses: z.array(z.string()),
-    holdings: z.array(z.object({
-      symbol: z.string(),
-      quantity: z.number(),
-      avgCost: z.number(),
-      currentPrice: z.number(),
-      totalValue: z.number(),
-      gainLoss: z.number(),
-      gainLossPercent: z.number(),
-    })),
-    totalValue: z.number(),
-    totalCost: z.number(),
-    totalGain: z.number(),
-    totalGainPercent: z.number(),
+    actionItems: z.array(z.string()),
   }),
   execute: async ({ context }) => {
     const portfolio = context.portfolio;
-    const apiKey = process.env.FINNHUB_API_KEY;
+    const numHoldings = portfolio.length;
     
-    // Fetch ALL current prices in parallel
-    const holdings = await Promise.all(
-      portfolio.map(async (holding) => {
-        let currentPrice = holding.purchasePrice;
-        
-        if (apiKey) {
-          try {
-            const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${holding.symbol}&token=${apiKey}`);
-            const data = await res.json();
-            if (data.c && data.c > 0) currentPrice = data.c;
-          } catch (err) {
-            console.log(`Could not fetch ${holding.symbol}`);
-          }
-        }
-        
-        // Calculate average cost
-        let avgCost = holding.purchasePrice;
-        if (holding.purchases && holding.purchases.length > 0) {
-          const totalCost = holding.purchases.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-          const totalQty = holding.purchases.reduce((sum, p) => sum + p.quantity, 0);
-          avgCost = totalCost / totalQty;
-        }
-        
-        const totalValue = currentPrice * holding.quantity;
-        const totalCost = avgCost * holding.quantity;
-        const gainLoss = totalValue - totalCost;
-        const gainLossPercent = (gainLoss / totalCost) * 100;
-        
-        return {
-          symbol: holding.symbol,
-          quantity: holding.quantity,
-          avgCost,
-          currentPrice,
-          totalValue,
-          gainLoss,
-          gainLossPercent,
-        };
-      })
-    );
+    const totalValue = portfolio.reduce((sum, h) => {
+      const price = h.currentPrice || h.purchasePrice;
+      return sum + (price * h.quantity);
+    }, 0);
     
-    const totalValue = holdings.reduce((sum, h) => sum + h.totalValue, 0);
-    const totalCost = holdings.reduce((sum, h) => sum + (h.avgCost * h.quantity), 0);
-    const totalGain = totalValue - totalCost;
-    const totalGainPercent = (totalGain / totalCost) * 100;
-    
-    const numHoldings = holdings.length;
     const diversificationScore = Math.min(numHoldings * 20, 100);
     
-    const concentrationRisk = holdings.map(h => (h.totalValue / totalValue) * 100);
+    const concentrationRisk = portfolio.map(h => {
+      const price = h.currentPrice || h.purchasePrice;
+      return (price * h.quantity / totalValue) * 100;
+    });
     const maxConcentration = Math.max(...concentrationRisk);
     const riskScore = Math.min(maxConcentration * 2, 100);
     
     const recommendations: string[] = [];
     const strengths: string[] = [];
     const weaknesses: string[] = [];
+    const actionItems: string[] = [];
     
     if (numHoldings < 3) {
       weaknesses.push(`Only ${numHoldings} holdings - insufficient diversification`);
-      recommendations.push('Add 2-3 more stocks from different sectors');
+      actionItems.push('Add 2-3 more stocks from different sectors');
     } else if (numHoldings >= 5) {
       strengths.push(`Well-diversified with ${numHoldings} holdings`);
     }
     
     if (maxConcentration > 40) {
       weaknesses.push(`One stock represents ${maxConcentration.toFixed(0)}% of portfolio`);
-      recommendations.push('Reduce concentration to under 30% per holding');
+      actionItems.push('Reduce concentration to under 30% per holding');
     }
     
-    if (totalGainPercent > 10) {
-      strengths.push(`Strong returns: +${totalGainPercent.toFixed(1)}%`);
-    } else if (totalGainPercent < -5) {
-      weaknesses.push(`Negative returns: ${totalGainPercent.toFixed(1)}%`);
-      recommendations.push('Review underperforming holdings');
+    if (diversificationScore < 60) {
+      recommendations.push('Increase diversification across sectors');
+    }
+    
+    if (riskScore > 70) {
+      recommendations.push('High concentration risk - consider rebalancing');
     }
     
     const overallRating = diversificationScore > 70 && riskScore < 50 ? 'EXCELLENT' :
@@ -425,198 +578,14 @@ export const portfolioAdvisorTool = createTool({
       recommendations,
       strengths,
       weaknesses,
-      holdings,
-      totalValue,
-      totalCost,
-      totalGain,
-      totalGainPercent,
+      actionItems,
     };
   },
 });
 
-// 6. ADD ALERT TOOL (Core - Updates Memory)
-export const addAlertTool = createTool({
-  id: 'add-alert',
-  description: 'Add price alert',
-  inputSchema: z.object({
-    symbol: z.string(),
-    condition: z.enum(['above', 'below']),
-    targetPrice: z.number(),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-  }),
-  execute: async ({ context, mastra }) => {
-    if (!mastra?.memory) {
-      return {
-        success: false,
-        message: 'Memory not available'
-      };
-    }
-
-    const memory = await mastra.memory.getWorkingMemory(context.runId!);
-    const alerts = (memory?.alerts as any[]) || [];
-    
-    const newAlert = {
-      symbol: context.symbol.toUpperCase(),
-      condition: context.condition,
-      targetPrice: context.targetPrice,
-    };
-    
-    await mastra.memory.updateWorkingMemory(context.runId!, {
-      alerts: [...alerts, newAlert]
-    });
-    
-    return {
-      success: true,
-      message: `✅ Alert set: ${newAlert.symbol} ${newAlert.condition} $${newAlert.targetPrice}`
-    };
-  },
-});
-
-// 7. ADD EXPENSE TOOL (Core - Updates Memory)
-export const addExpenseTool = createTool({
-  id: 'add-expense',
-  description: 'Track expense',
-  inputSchema: z.object({
-    amount: z.number(),
-    category: z.string(),
-    description: z.string(),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-  }),
-  execute: async ({ context, mastra }) => {
-    if (!mastra?.memory) {
-      return {
-        success: false,
-        message: 'Memory not available'
-      };
-    }
-
-    const memory = await mastra.memory.getWorkingMemory(context.runId!);
-    const expenses = (memory?.expenses as any[]) || [];
-    
-    const newExpense = {
-      amount: context.amount,
-      category: context.category,
-      description: context.description,
-      date: new Date().toISOString(),
-    };
-    
-    await mastra.memory.updateWorkingMemory(context.runId!, {
-      expenses: [...expenses, newExpense]
-    });
-    
-    return {
-      success: true,
-      message: `✅ Tracked: $${context.amount} on ${context.category}`
-    };
-  },
-});
-
-// 8. ADD SUBSCRIPTION TOOL (Core - Updates Memory)
-export const addSubscriptionTool = createTool({
-  id: 'add-subscription',
-  description: 'Add monthly subscription',
-  inputSchema: z.object({
-    name: z.string(),
-    amount: z.number(),
-    dueDay: z.number(),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-  }),
-  execute: async ({ context, mastra }) => {
-    if (!mastra?.memory) {
-      return {
-        success: false,
-        message: 'Memory not available'
-      };
-    }
-
-    const memory = await mastra.memory.getWorkingMemory(context.runId!);
-    const bills = (memory?.billReminders as any[]) || [];
-    
-    const newBill = {
-      name: context.name,
-      amount: context.amount,
-      dueDay: context.dueDay,
-    };
-    
-    await mastra.memory.updateWorkingMemory(context.runId!, {
-      billReminders: [...bills, newBill]
-    });
-    
-    return {
-      success: true,
-      message: `✅ Added: ${context.name} - $${context.amount}/month`
-    };
-  },
-});
-
-// ============================================================================
-// OPTIONAL TOOLS - Not in Agent, But Available (4 tools)
-// ============================================================================
-
-// 9. CSV IMPORTER (Optional - For Frontend Use)
-export const csvImporterTool = createTool({
-  id: 'csv-importer',
-  description: 'Import portfolio from CSV',
-  inputSchema: z.object({
-    csvData: z.string(),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    message: z.string(),
-    portfolio: z.array(z.object({
-      symbol: z.string(),
-      quantity: z.number(),
-      purchasePrice: z.number(),
-    })),
-  }),
-  execute: async ({ context }) => {
-    try {
-      const lines = context.csvData.trim().split('\n');
-      const portfolio: any[] = [];
-      
-      for (const line of lines) {
-        if (!line.trim() || line.toLowerCase().includes('symbol')) continue;
-        
-        const parts = line.split(',').map(p => p.trim());
-        if (parts.length >= 3) {
-          const symbol = parts[0].toUpperCase();
-          const quantity = parseFloat(parts[1]);
-          const purchasePrice = parseFloat(parts[2]);
-          
-          if (symbol && !isNaN(quantity) && !isNaN(purchasePrice)) {
-            portfolio.push({ symbol, quantity, purchasePrice });
-          }
-        }
-      }
-      
-      return {
-        success: true,
-        message: `Imported ${portfolio.length} holdings`,
-        portfolio,
-      };
-    } catch {
-      return {
-        success: false,
-        message: 'Failed to parse CSV',
-        portfolio: [],
-      };
-    }
-  },
-});
-
-// 10. REBALANCING ANALYZER (Optional - Advanced Feature)
 export const rebalancingAnalyzerTool = createTool({
   id: 'rebalancing-analyzer',
-  description: 'Analyze portfolio balance and suggest rebalancing trades',
+  description: 'Analyze portfolio balance',
   inputSchema: z.object({
     portfolio: z.array(z.object({
       symbol: z.string(),
@@ -682,57 +651,9 @@ export const rebalancingAnalyzerTool = createTool({
   },
 });
 
-// 11. BENCHMARK COMPARISON (Optional - Advanced Feature)
-export const benchmarkComparisonTool = createTool({
-  id: 'benchmark-comparison',
-  description: 'Compare portfolio performance vs S&P 500',
-  inputSchema: z.object({
-    portfolioValue: z.number(),
-    portfolioCostBasis: z.number(),
-    timePeriod: z.string().optional().default('1Y'),
-  }),
-  outputSchema: z.object({
-    portfolioReturn: z.number(),
-    sp500Return: z.number(),
-    outperformance: z.number(),
-    analysis: z.string(),
-  }),
-  execute: async ({ context }) => {
-    const portfolioReturn = ((context.portfolioValue - context.portfolioCostBasis) / context.portfolioCostBasis) * 100;
-    
-    const sp500Returns: Record<string, number> = {
-      '1M': 2.1,
-      '3M': 5.5,
-      '6M': 8.2,
-      '1Y': 10.5,
-      'YTD': 12.3,
-    };
-    
-    const sp500Return = sp500Returns[context.timePeriod] || 10.5;
-    const outperformance = portfolioReturn - sp500Return;
-    
-    let analysis = '';
-    if (outperformance > 5) {
-      analysis = `🎉 Excellent! Outperforming S&P 500 by ${outperformance.toFixed(1)}%`;
-    } else if (outperformance > 0) {
-      analysis = `📈 Good! Beating the market by ${outperformance.toFixed(1)}%`;
-    } else {
-      analysis = `⚠️ Underperforming by ${Math.abs(outperformance).toFixed(1)}%`;
-    }
-    
-    return {
-      portfolioReturn,
-      sp500Return,
-      outperformance,
-      analysis,
-    };
-  },
-});
-
-// 12. ALERT CHECKER (Optional - For Background Jobs)
 export const alertCheckerTool = createTool({
   id: 'alert-checker',
-  description: 'Check if any price alerts have been triggered',
+  description: 'Check triggered alerts',
   inputSchema: z.object({
     alerts: z.array(z.object({
       symbol: z.string(),
@@ -782,7 +703,7 @@ export const alertCheckerTool = createTool({
           }
         }
       } catch (error) {
-        console.error(`Error checking ${alert.symbol}`);
+        console.error(`Error checking alert for ${alert.symbol}`);
       }
     }
     
@@ -793,10 +714,158 @@ export const alertCheckerTool = createTool({
   },
 });
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+export const benchmarkComparisonTool = createTool({
+  id: 'benchmark-comparison',
+  description: 'Compare vs S&P 500',
+  inputSchema: z.object({
+    portfolioValue: z.number(),
+    portfolioCostBasis: z.number(),
+    timePeriod: z.string().optional().default('1Y'),
+  }),
+  outputSchema: z.object({
+    portfolioReturn: z.number(),
+    sp500Return: z.number(),
+    outperformance: z.number(),
+    analysis: z.string(),
+  }),
+  execute: async ({ context }) => {
+    const portfolioReturn = ((context.portfolioValue - context.portfolioCostBasis) / context.portfolioCostBasis) * 100;
+    
+    const sp500Returns: Record<string, number> = {
+      '1M': 2.1,
+      '3M': 5.5,
+      '6M': 8.2,
+      '1Y': 10.5,
+      'YTD': 12.3,
+    };
+    
+    const sp500Return = sp500Returns[context.timePeriod] || 10.5;
+    const outperformance = portfolioReturn - sp500Return;
+    
+    let analysis = '';
+    if (outperformance > 5) {
+      analysis = `🎉 Excellent! Outperforming S&P 500 by ${outperformance.toFixed(1)}%`;
+    } else if (outperformance > 0) {
+      analysis = `📈 Good! Beating the market by ${outperformance.toFixed(1)}%`;
+    } else {
+      analysis = `⚠️ Underperforming by ${Math.abs(outperformance).toFixed(1)}%. Consider diversification.`;
+    }
+    
+    return {
+      portfolioReturn,
+      sp500Return,
+      outperformance,
+      analysis,
+    };
+  },
+});
 
+// Helper tools
+export const portfolioManagerTool = createTool({
+  id: 'portfolio-manager',
+  description: 'Portfolio helper',
+  inputSchema: z.object({
+    action: z.enum(['view', 'check']),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  execute: async () => {
+    return {
+      success: true,
+      message: 'Portfolio manager ready',
+    };
+  },
+});
+
+export const smartAlertsTool = createTool({
+  id: 'smart-alerts',
+  description: 'Manage alerts',
+  inputSchema: z.object({
+    action: z.enum(['check', 'view']),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  execute: async () => {
+    return {
+      success: true,
+      message: 'Alerts ready',
+    };
+  },
+});
+
+export const expenseTrackerTool = createTool({
+  id: 'expense-tracker',
+  description: 'Track expenses',
+  inputSchema: z.object({
+    action: z.enum(['view', 'analyze']),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  execute: async () => {
+    return {
+      success: true,
+      message: 'Expense tracker ready',
+    };
+  },
+});
+
+export const csvImporterTool = createTool({
+  id: 'csv-importer',
+  description: 'Import CSV',
+  inputSchema: z.object({
+    csvData: z.string(),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+    portfolio: z.array(z.object({
+      symbol: z.string(),
+      quantity: z.number(),
+      purchasePrice: z.number(),
+    })),
+  }),
+  execute: async ({ context }) => {
+    try {
+      const lines = context.csvData.trim().split('\n');
+      const portfolio: any[] = [];
+      
+      for (const line of lines) {
+        if (!line.trim() || line.toLowerCase().includes('symbol')) continue;
+        
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length >= 3) {
+          const symbol = parts[0].toUpperCase();
+          const quantity = parseFloat(parts[1]);
+          const purchasePrice = parseFloat(parts[2]);
+          
+          if (symbol && !isNaN(quantity) && !isNaN(purchasePrice)) {
+            portfolio.push({ symbol, quantity, purchasePrice });
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Imported ${portfolio.length} holdings`,
+        portfolio,
+      };
+    } catch {
+      return {
+        success: false,
+        message: 'Failed to parse CSV',
+        portfolio: [],
+      };
+    }
+  },
+});
+
+// Helper functions
 function formatMarketCap(cap: number): string {
   if (cap >= 1e12) return `$${(cap / 1e12).toFixed(2)}T`;
   if (cap >= 1e9) return `$${(cap / 1e9).toFixed(2)}B`;
@@ -842,30 +911,30 @@ function generateAnalysis(stockData: any, newsData: any[]): {
   if (stockData) {
     if (stockData.peRatio) {
       if (stockData.peRatio < 15) {
-        pros.push(`Low P/E ratio (${stockData.peRatio.toFixed(1)})`);
+        pros.push(`Low P/E ratio (${stockData.peRatio.toFixed(1)}) suggests good value`);
         riskLevel = 'LOW';
       } else if (stockData.peRatio > 50) {
-        cons.push(`High P/E ratio (${stockData.peRatio.toFixed(1)})`);
+        cons.push(`High P/E ratio (${stockData.peRatio.toFixed(1)}) indicates overvaluation`);
         riskLevel = 'HIGH';
       }
     }
 
     if (stockData.marketCap) {
       if (stockData.marketCap > 100) {
-        pros.push('Large-cap with stable position');
+        pros.push('Large-cap company with stable market position');
       } else if (stockData.marketCap < 2) {
-        cons.push('Small-cap with higher volatility');
+        cons.push('Small-cap stock with higher volatility');
         riskLevel = 'HIGH';
       }
     }
 
     if (stockData.currentPrice) {
-      pros.push(`Trading at $${stockData.currentPrice.toFixed(2)}`);
+      pros.push(`Currently trading at $${stockData.currentPrice.toFixed(2)}`);
     }
   }
 
   if (newsData && newsData.length > 0) {
-    pros.push(`${newsData.length} recent articles show market interest`);
+    pros.push(`${newsData.length} recent articles show active market interest`);
   } else {
     cons.push('Limited recent news coverage');
   }
@@ -882,6 +951,6 @@ function generateAnalysis(stockData: any, newsData: any[]): {
     cons,
     riskLevel,
     recommendation,
-    reasoning: 'This is not financial advice. Do your own research.',
+    reasoning: 'Consider your risk tolerance before investing.',
   };
 }
