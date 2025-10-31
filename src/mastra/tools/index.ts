@@ -2,10 +2,6 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import nodemailer from 'nodemailer';
 
-// ============================================================================
-// EMAIL NOTIFICATION TOOL - NEW! 📧
-// ============================================================================
-
 export const emailNotificationTool = createTool({
   id: 'email-notification',
   description: 'Send email notifications to users for alerts and subscriptions',
@@ -23,7 +19,7 @@ export const emailNotificationTool = createTool({
       console.log(`📧 Sending email to ${context.to}...`);
       
       // Configure nodemailer transporter for Gmail
-      const transporter = nodemailer.createTransporter({
+      const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
@@ -55,10 +51,6 @@ export const emailNotificationTool = createTool({
     }
   },
 });
-
-// ============================================================================
-// IPO RESEARCH - WITH FINNHUB IPO CALENDAR API! 🎯
-// ============================================================================
 
 export const ipoResearchTool = createTool({
   id: 'ipo-research',
@@ -229,9 +221,6 @@ Found ${ipoDetails.length} IPOs:\n\n` + ipoDetails.map((ipo: any, idx: number) =
   },
 });
 
-// ============================================================================
-// PORTFOLIO PROFIT CALCULATOR
-// ============================================================================
 
 export const portfolioProfitCalculatorTool = createTool({
   id: 'portfolio-profit-calculator',
@@ -344,10 +333,6 @@ ${totalProfit >= 0 ? '📈' : '📉'} **Profit/Loss:** ${totalProfit >= 0 ? '+' 
     }
   },
 });
-
-// ============================================================================
-// STOCK ANALYZER - Enhanced
-// ============================================================================
 
 export type StockAnalysisResult = z.infer<typeof StockAnalysisSchema>;
 

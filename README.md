@@ -1,307 +1,258 @@
-# Builders' Challenge #3: AI Agents 102
-**Presented by Nosana and Mastra**
+# FinanceAI - AI-Powered Stock Research & Portfolio Management Agent
 
-![Agent](./assets/NosanaBuildersChallenge03.jpg)
+**Nosana Builders Challenge #3 Submission**
 
-## Welcome to the AI Agent Challenge
+## 🎯 Project Overview
 
-Build and deploy intelligent AI agents using the **Mastra framework** on the **Nosana decentralized compute network**. Whether you're a beginner or an experienced developer, this challenge has something for everyone!
+FinanceAI is an intelligent AI agent that helps users make informed investment decisions through comprehensive stock research, real-time portfolio analysis, and automated financial tracking. Built with Mastra framework and deployed on Nosana's decentralized network.
 
-## 🎯 Challenge Overview
+### What It Does
 
-**Your Mission:** Build an intelligent AI agent with a frontend interface and deploy it on Nosana's decentralized network.
+FinanceAI serves as your personal financial analyst, providing:
+- **Real-time stock research** with market data, news, and analysis
+- **Portfolio management** with profit/loss tracking and live price updates
+- **Investment recommendations** based on diversification and risk analysis
+- **Price alerts** with email notifications
+- **Expense and subscription tracking** for complete financial overview
+- **IPO research** for new investment opportunities
 
-### What You'll Build
+## ✨ Key Features
 
-Create an AI agent that performs real-world tasks using:
-- **Mastra framework** for agent orchestration
-- **Tool calling** to interact with external services
-- **MCP (Model Context Protocol)** for enhanced capabilities
-- **Custom frontend** to showcase your agent's functionality
+### Stock Research & Analysis
+- 📊 Real-time stock quotes with P/E ratios, market cap, and 52-week highs
+- 🔍 Deep investment research with pros/cons analysis and risk assessment
+- 📰 Latest market news and stock-specific news
+- 🆚 Side-by-side stock comparisons
+- 🎯 IPO research with calendar and investment analysis
 
-### Agent Ideas & Examples
+### Portfolio Management
+- 💼 Track multiple holdings with purchase price and quantity
+- 📈 Live portfolio valuation with auto-refresh (30s intervals)
+- 💰 Real-time profit/loss calculations with percentage gains
+- 📊 Portfolio analysis with diversification and risk scores
+- 🎯 AI-powered investment recommendations
+- 📂 CSV bulk import for easy portfolio setup
 
-The possibilities are endless! Here are some ideas to get you started:
+### Smart Alerts & Notifications
+- 🔔 Set price alerts (above/below target prices)
+- 📧 Email notifications when alerts trigger
+- ⚡ Instant notifications for portfolio events
 
-- 🤖 **Personal Assistant** - Schedule management, email drafting, task automation
-- 📊 **Data Analyst Agent** - Fetch financial data, generate insights, create visualizations
-- 🌐 **Web Researcher** - Aggregate information from multiple sources, summarize findings
-- 🛠️ **DevOps Helper** - Monitor services, automate deployments, manage infrastructure
-- 🎨 **Content Creator** - Generate social media posts, blog outlines, marketing copy
-- 🔍 **Smart Search** - Multi-source search with AI-powered result synthesis
-- 💬 **Customer Support Bot** - Answer FAQs, ticket routing, knowledge base queries
+### Financial Tracking
+- 💸 Expense tracking by category
+- 📝 Subscription management with monthly totals
+- 📅 Automated monthly summaries
 
-**Be Creative!** The best agents solve real problems in innovative ways.
+## 🛠️ Technology Stack
 
-## Getting Started Template
+- **Agent Framework**: Mastra.ai
+- **Frontend**: Next.js 14, React, TypeScript
+- **UI Library**: CopilotKit for AI chat interface
+- **Styling**: TailwindCSS with custom luxury theme
+- **LLM**: Qwen3:8b (via Nosana/Ollama)
+- **APIs**: 
+  - Finnhub API (stock data)
+  - NewsAPI (market news)
+  - Nodemailer (email notifications)
+- **Database**: LibSQL for persistent storage
+- **Deployment**: Docker + Nosana Network
 
-This is a starter template for building AI agents using [Mastra](https://mastra.ai) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with integrated AI capabilities and a beautiful UI.
+## 🚀 Live Demo
 
-## Getting Started
+**Deployed on Nosana Network**
+- Demo Video: [YouTube Link](#)
+- Docker Image: `pranav1100/financeai:latest`
+- Live URL: [Your Nosana Deployment URL](#)
 
-### Prerequisites & Registration
 
-To participate in the challenge and get Nosana credits/NOS tokens, complete these steps:
+## 🎮 How to Use
 
-1. Register at [SuperTeam](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102)
-2. Register at the [Luma Page](https://luma.com/zkob1iae)
-3. Star these repos:
-   - [this repo](https://github.com/nosana-ci/agent-challenge)
-   - [Nosana CLI](https://github.com/nosana-ci/nosana-cli)
-   - [Nosana SDK](https://github.com/nosana-ci/nosana-sdk)
-4. Complete [this registration form](https://e86f0b9c.sibforms.com/serve/MUIFALaEjtsXB60SDmm1_DHdt9TOSRCFHOZUSvwK0ANbZDeJH-sBZry2_0YTNi1OjPt_ZNiwr4gGC1DPTji2zdKGJos1QEyVGBzTq_oLalKkeHx3tq2tQtzghyIhYoF4_sFmej1YL1WtnFQyH0y1epowKmDFpDz_EdGKH2cYKTleuTu97viowkIIMqoDgMqTD0uBaZNGwjjsM07T)
+### Quick Start Commands
 
-### Setup Your Development Environment
+1. **Get Stock Quotes**
+   - "What's AAPL price?"
+   - "Show me Tesla stock info"
 
-#### **Step 1: Fork, Clone and Quickstart**
+2. **Research Investments**
+   - "Should I buy Tesla?"
+   - "Compare Apple vs Microsoft"
+   - "Tell me about Lenskart IPO"
+
+3. **Manage Portfolio**
+   - "Add 10 shares of Apple at $271"
+   - "Analyze my portfolio"
+   - "What should I do in my portfolio?"
+   - "Which stocks should I sell?"
+
+4. **Set Alerts**
+   - "Alert me if Apple drops below $160"
+   - "Notify me when Tesla goes above $500"
+
+5. **Track Finances**
+   - "I spent $45 on lunch"
+   - "Add Netflix subscription $15 monthly"
+   - "Show my expenses"
+
+## 💻 Local Development Setup
+
+### Prerequisites
+
+- Node.js 18+ and pnpm
+- Docker (for deployment)
+- API Keys (see Environment Variables below)
+
+### Installation
 
 ```bash
-# Fork this repo on GitHub, then clone your fork
+# Clone the repository
 git clone https://github.com/YOUR-USERNAME/agent-challenge
-
 cd agent-challenge
 
+# Install dependencies
+pnpm install
+
+# Setup environment variables
 cp .env.example .env
+# Edit .env with your API keys
 
-pnpm i
-
-pnpm run dev:ui      # Start UI server (port 3000)
-pnpm run dev:agent   # Start Mastra agent server (port 4111)
+# Start development servers
+pnpm run dev:ui      # Frontend (localhost:3000)
+pnpm run dev:agent   # Agent server (localhost:4111)
 ```
 
-Open <http://localhost:3000> to see your agent in action in the frontend.
-Open <http://localhost:4111> to open up the Mastra Agent Playground.
+### Environment Variables
 
-#### **Step 2: Choose Your LLM for Development (Optional)**
-
-Pick one option below to power your agent during development:
-
-##### Option A: Use Shared Nosana LLM Endpoint (Recommended - No Setup!)
-
-We provide a free LLM endpoint hosted on Nosana for development. Edit your `.env`:
+Create a `.env` file with the following:
 
 ```env
-# Qwen3:8b - Nosana Endpoint
-# Note baseURL for Ollama needs to be appended with `/api`
+# LLM Configuration (Choose one)
+# Option 1: Nosana Endpoint (Recommended)
 OLLAMA_API_URL=https://3yt39qx97wc9hqwwmylrphi4jsxrngjzxnjakkybnxbw.node.k8s.prd.nos.ci/api
 MODEL_NAME_AT_ENDPOINT=qwen3:8b
+
+# Option 2: Local Ollama
+# OLLAMA_API_URL=http://127.0.0.1:11434/api
+# MODEL_NAME_AT_ENDPOINT=qwen3:8b
+
+# API Keys (Required)
+NEXT_PUBLIC_FINNHUB_API_KEY=your_finnhub_api_key
+FINNHUB_API_KEY=your_finnhub_api_key
+
+# Optional: News and Email
+NEXT_PUBLIC_NEWS_API_KEY=your_newsapi_key
+NEWS_API_KEY=your_newsapi_key
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASS=your-gmail-app-password
 ```
 
-If it goes down, reach out on [Discord](https://discord.com/channels/236263424676331521/1354391113028337664)
+### Get API Keys
 
-##### Option B: Use Local LLM
+- **Finnhub**: Free at [finnhub.io](https://finnhub.io) (Required)
+- **NewsAPI**: Free at [newsapi.org](https://newsapi.org) (Optional)
+- **Gmail App Password**: [Generate here](https://myaccount.google.com/apppasswords) (Optional)
 
-Run Ollama locally (requires [Ollama installed](https://ollama.com/download)):
+## 🐳 Docker Deployment
+
+### Build and Test Locally
 
 ```bash
-ollama pull qwen3:0.6b
-ollama serve
-```
+# Build Docker image
+docker build -t yourusername/financeai:latest .
 
-Edit your `.env`:
-```env
-OLLAMA_API_URL=http://127.0.0.1:11434/api
-MODEL_NAME_AT_ENDPOINT=qwen3:0.6b
-```
-
-##### Option C: Use OpenAI
-
-Add to your `.env` and uncomment the OpenAI line in `src/mastra/agents/index.ts`:
-
-```env
-OPENAI_API_KEY=your-key-here
-```
-
-## 🏗️ Implementation Timeline
-
-**Important Dates:**
-- Start Challenge: 10 October
-- Submission Deadline: 31 October
-- Winners Announced: 07 November
-
-### Phase 1: Development
-
-1. **Setup** : Fork repo, install dependencies, choose template
-2. **Build** : Implement your tool functions and agent logic
-3. **Test** : Validate functionality at http://localhost:3000
-
-### Phase 2: Containerization
-
-1. **Clean up**: Remove unused agents from `src/mastra/index.ts`
-2. **Build**: Create Docker container using the provided `Dockerfile`
-3. **Test locally**: Verify container works correctly
-
-```bash
-# Build your container (using the provided Dockerfile)
-docker build -t yourusername/agent-challenge:latest .
-
-# Test locally first
-docker run -p 3000:3000 yourusername/agent-challenge:latest 
+# Test locally
+docker run -p 3000:3000 \
+  -e OLLAMA_API_URL=your_url \
+  -e FINNHUB_API_KEY=your_key \
+  yourusername/financeai:latest
 
 # Push to Docker Hub
 docker login
-docker push yourusername/agent-challenge:latest
+docker push yourusername/financeai:latest
 ```
 
-### Phase 3: Deployment to Nosana
-1. **Deploy your complete stack**: The provided `Dockerfile` will deploy:
-   - Your Mastra agent
-   - Your frontend interface
-   - An LLM to power your agent (all in one container!)
-2. **Verify**: Test your deployed agent on Nosana network
-3. **Capture proof**: Screenshot or get deployment URL for submission
+### Deploy to Nosana
 
-### Phase 4: Video Demo
+1. **Via Nosana Dashboard**:
+   - Go to [dashboard.nosana.com/deploy](https://dashboard.nosana.com/deploy)
+   - Edit `nos_job_def/nosana_mastra.json` with your image name
+   - Select GPU and deploy
 
-Record a 1-3 minute video demonstrating:
-- Your agent **running on Nosana** (show the deployed version!)
-- Key features and functionality
-- The frontend interface in action
-- Real-world use case demonstration
-- Upload to YouTube, Loom, or similar platform
-
-### Phase 5: Documentation
-
-Update this README with:
-- Agent description and purpose
-- What tools/APIs your agent uses
-- Setup instructions
-- Environment variables required
-- Example usage and screenshots
-
-## ✅ Minimum Requirements
-
-Your submission **must** include:
-
-- [ ] **Agent with Tool Calling** - At least one custom tool/function
-- [ ] **Frontend Interface** - Working UI to interact with your agent
-- [ ] **Deployed on Nosana** - Complete stack running on Nosana network
-- [ ] **Docker Container** - Published to Docker Hub
-- [ ] **Video Demo** - 1-3 minute demonstration
-- [ ] **Updated README** - Clear documentation in your forked repo
-- [ ] **Social Media Post** - Share on X/BlueSky/LinkedIn with #NosanaAgentChallenge
-
-## Submission Process
-
-1. **Complete all requirements** listed above
-2. **Commit all of your changes to the `main` branch of your forked repository**
-   - All your code changes
-   - Updated README
-   - Link to your Docker container
-   - Link to your video demo
-   - Nosana deployment proof
-3. **Social Media Post** (Required): Share your submission on X (Twitter), BlueSky, or LinkedIn
-   - Tag @nosana_ai
-   - Include a brief description of your agent
-   - Add hashtag #NosanaAgentChallenge
-4. **Finalize your submission on the [SuperTeam page](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102)**
-   - Add your forked GitHub repository link
-   - Add a link to your social media post
-   - Submissions that do not meet all requirements will not be considered
-
-## 🚀 Deploying to Nosana
-
-
-### Using Nosana Dashboard
-1. Open [Nosana Dashboard](https://dashboard.nosana.com/deploy)
-2. Click `Expand` to open the job definition editor
-3. Edit `nos_job_def/nosana_mastra.json` with your Docker image:
-   ```json
-   {
-     "image": "yourusername/agent-challenge:latest"
-   }
-   ```
-4. Copy and paste the edited job definition
-5. Select a GPU
-6. Click `Deploy`
-
-### Using Nosana CLI (Alternative)
+2. **Via Nosana CLI**:
 ```bash
 npm install -g @nosana/cli
 nosana job post --file ./nos_job_def/nosana_mastra.json --market nvidia-3090 --timeout 30
 ```
 
-## 🏆 Judging Criteria
+## 🏗️ Architecture
 
-Submissions evaluated on 4 key areas (25% each):
+### Agent Tools
 
-### 1. Innovation 🎨
-- Originality of agent concept
-- Creative use of AI capabilities
-- Unique problem-solving approach
+FinanceAI uses 13 custom tools:
 
-### 2. Technical Implementation 💻
-- Code quality and organization
-- Proper use of Mastra framework
-- Efficient tool implementation
-- Error handling and robustness
+1. **stockAnalyzerTool** - Real-time stock quotes and metrics
+2. **smartStockResearchTool** - Deep investment research with pros/cons
+3. **portfolioProfitCalculatorTool** - Calculate portfolio P&L
+4. **portfolioAdvisorTool** - AI portfolio analysis and recommendations
+5. **ipoResearchTool** - IPO calendar and research
+6. **alertCheckerTool** - Monitor and trigger price alerts
+7. **emailNotificationTool** - Send email notifications
+8. **expenseTrackerTool** - Track expenses
+9. **csvImporterTool** - Bulk import portfolios
+10. **rebalancingAnalyzerTool** - Portfolio rebalancing suggestions
+11. **benchmarkComparisonTool** - Compare vs S&P 500
+12. **portfolioManagerTool** - Manage holdings
+13. **smartAlertsTool** - Manage price alerts
 
-### 3. Nosana Integration ⚡
-- Successful deployment on Nosana
-- Resource efficiency
-- Stability and performance
-- Proper containerization
+### Data Flow
 
-### 4. Real-World Impact 🌍
-- Practical use cases
-- Potential for adoption
-- Clear value proposition
-- Demonstration quality
+```
+User Input → CopilotKit UI → Mastra Agent → Tools → External APIs
+                                    ↓
+                            Working Memory (LibSQL)
+                                    ↓
+                            Response → Frontend Display
+```
 
-## 🎁 Prizes
+## 🎯 Innovation Highlights
 
-**Top 10 submissions will be rewarded:**
-- 🥇 1st Place: $1,000 USDC
-- 🥈 2nd Place: $750 USDC
-- 🥉 3rd Place: $450 USDC
-- 🏅 4th Place: $200 USDC
-- 🏅 5th-10th Place: $100 USDC each
+1. **Comprehensive Financial Management** - Combines stock research, portfolio tracking, and personal finance in one agent
+2. **Real-time Updates** - Live price tracking with 30-second auto-refresh
+3. **Intelligent Recommendations** - AI-powered portfolio analysis with actionable insights
+4. **Multi-source Data** - Integrates Finnhub, NewsAPI, and email for complete financial picture
+5. **User-Friendly Interface** - Luxury-themed UI with intuitive chat-based interaction
+6. **Persistent Memory** - Remembers your portfolio, alerts, and preferences across sessions
 
-## 📚 Learning Resources
+## 📊 Use Cases
 
-For more information, check out the following resources:
+- **Individual Investors**: Research stocks and manage portfolio
+- **Day Traders**: Track multiple holdings with real-time prices
+- **Long-term Investors**: Monitor portfolio health and diversification
+- **Financial Planners**: Track client portfolios and expenses
+- **Students**: Learn about investing with real market data
 
-- [Nosana Documentation](https://docs.nosana.io)
-- [Mastra Documentation](https://mastra.ai/en/docs) - Learn more about Mastra and its features
-- [CopilotKit Documentation](https://docs.copilotkit.ai) - Explore CopilotKit's capabilities
-- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
-- [Docker Documentation](https://docs.docker.com)
-- [Nosana CLI](https://github.com/nosana-ci/nosana-cli)
-- [Mastra Agents Overview](https://mastra.ai/en/docs/agents/overview)
-- [Build an AI Stock Agent Guide](https://mastra.ai/en/guides/guide/stock-agent)
-- [Mastra Tool Calling Documentation](https://mastra.ai/en/docs/agents/tools)
+## 🔒 Security & Privacy
 
-## 🆘 Support & Community
-
-### Get Help
-- **Discord**: Join [Nosana Discord](https://nosana.com/discord) 
-- **Dedicated Channel**: [Builders Challenge Dev Chat](https://discord.com/channels/236263424676331521/1354391113028337664)
-- **Twitter**: Follow [@nosana_ai](https://x.com/nosana_ai) for live updates
-
-## 🎉 Ready to Build?
-
-1. **Fork** this repository
-2. **Build** your AI agent
-3. **Deploy** to Nosana
-4. **Present** your creation
-
-Good luck, builders! We can't wait to see the innovative AI agents you create for the Nosana ecosystem.
-
-**Happy Building!** 🚀
-
-## Stay in the Loop
-
-Want access to exclusive builder perks, early challenges, and Nosana credits?
-Subscribe to our newsletter and never miss an update.
-
-👉 [ Join the Nosana Builders Newsletter ](https://e86f0b9c.sibforms.com/serve/MUIFALaEjtsXB60SDmm1_DHdt9TOSRCFHOZUSvwK0ANbZDeJH-sBZry2_0YTNi1OjPt_ZNiwr4gGC1DPTji2zdKGJos1QEyVGBzTq_oLalKkeHx3tq2tQtzghyIhYoF4_sFmej1YL1WtnFQyH0y1epowKmDFpDz_EdGKH2cYKTleuTu97viowkIIMqoDgMqTD0uBaZNGwjjsM07T)
-
-Be the first to know about:
-- 🧠 Upcoming Builders Challenges
-- 💸 New reward opportunities
-- ⚙ Product updates and feature drops
-- 🎁 Early-bird credits and partner perks
-
-Join the Nosana builder community today — and build the future of decentralized AI.
+- Email addresses stored only in working memory
+- No sensitive financial data leaves your session
+- API keys managed via environment variables
+- All portfolio data stored locally in LibSQL
 
 
+## 🤝 Contributing
+
+While this is a challenge submission, feedback and suggestions are welcome! Open an issue or reach out on Discord.
+
+## 👨‍💻 Author
+
+**Your Name**
+- GitHub: [@pranav-1100](https://github.com/pranav-1100)
+- Twitter: [@pranavbuilds_](https://x.com/pranavbuilds_)
+- Email: pranavaggarwal1100@gmail.com
+
+##  Acknowledgments
+
+- **Nosana** for providing decentralized compute infrastructure
+- **Mastra** for the powerful agent framework
+- **CopilotKit** for the seamless chat UI
+- **Finnhub** for comprehensive stock market data
+- **Nosana Community** for support and feedback
