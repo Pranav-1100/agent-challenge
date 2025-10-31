@@ -2,7 +2,7 @@
 
 import { useCoAgent, useCopilotAction } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { FinanceAgentState } from "@/mastra/agents";
 import { z } from "zod";
 import { StockAnalysisResult, StockResearchResult } from "@/mastra/tools";
@@ -71,15 +71,84 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
   const [monthlyExpenses, setMonthlyExpenses] = useState(0);
   const [monthlySubscriptions, setMonthlySubscriptions] = useState(0);
 
-  // Update live portfolio prices every 5 seconds (demo) - in production would be 5 minutes
-  useEffect(() => {
-    const updatePortfolioPrices = async () => {
-      if (state.portfolio && state.portfolio.length > 0) {
-        try {
-          const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
-          const updated = await Promise.all(
-            state.portfolio.map(async (holding) => {
-              try {
+  // FIXED: Working CSV Upload Handler
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      console.log('📄 CSV Content:', text);
+      
+      // Parse CSV properly
+      const lines = text.trim().split('\n');
+      const newStocks: any[] = [];
+      
+      // Start from line 1 (skip header at line 0)
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length >= 3) {
+          const symbol = parts[0].toUpperCase();
+          const quantity = parseFloat(parts[1]);
+          const price = parseFloat(parts[2]);
+          
+          if (symbol && !isNaN(quantity) && !isNaN(price)) {
+            newStocks.push({
+              symbol,
+              quantity,
+              purchasePrice: price,
+            });
+          }
+        }
+      }
+      
+      console.log('✅ Parsed stocks:', newStocks);
+      
+      if (newStocks.length > 0) {
+        // Update state directly - this will trigger the agent and UI
+        setState((prev: any) => ({
+          ...prev,
+          portfolio: [...(prev.portfolio || []), ...newStocks]
+        }));
+        
+        // Show success message
+        alert(`✅ Successfully imported ${newStocks.length} stocks:\n${newStocks.map(s => `${s.symbol} (${s.quantity} shares @ $${s.purchasePrice})`).join('\n')}`);
+        setShowUploadModal(false);
+        
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else {
+        alert('❌ No valid data found in CSV.\n\nExpected format:\nSymbol,Quantity,Price\nAAPL,10,271.00\nMSFT,5,526.00');
+      }
+    };
+    
+    reader.onerror = () => {
+      alert('❌ Error reading file. Please try again.');
+    };
+    
+    reader.readAsText(file);
+  };
+
+  // FIXED: Make updatePortfolioPrices callable and dependent on state
+  const updatePortfolioPrices = useCallback(async () => {
+    if (state.portfolio && state.portfolio.length > 0) {
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
+        
+        if (!apiKey) {
+          console.warn('⚠️ FINNHUB_API_KEY not set - using purchase prices');
+        }
+        
+        const updated = await Promise.all(
+          state.portfolio.map(async (holding) => {
+            try {
+              if (apiKey) {
                 const response = await fetch(`https://finnhub.io/api/v1/quote?symbol=${holding.symbol}&token=${apiKey}`);
                 const data = await response.json();
                 const currentPrice = data.c || holding.purchasePrice;
@@ -95,7 +164,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   gainLoss,
                   gainLossPercent,
                 };
-              } catch {
+              } else {
+                // No API key - use purchase price
                 return {
                   ...holding,
                   currentPrice: holding.purchasePrice,
@@ -104,24 +174,52 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   gainLossPercent: 0,
                 };
               }
-            })
-          );
-          
-          setLivePortfolio(updated);
-          const totalValue = updated.reduce((sum, h) => sum + h.totalValue, 0);
-          const totalGain = updated.reduce((sum, h) => sum + h.gainLoss, 0);
-          setPortfolioValue(totalValue);
-          setPortfolioGain(totalGain);
-        } catch (error) {
-          console.error('Error updating portfolio:', error);
-        }
+            } catch (error) {
+              console.error(`Error fetching ${holding.symbol}:`, error);
+              return {
+                ...holding,
+                currentPrice: holding.purchasePrice,
+                totalValue: holding.purchasePrice * holding.quantity,
+                gainLoss: 0,
+                gainLossPercent: 0,
+              };
+            }
+          })
+        );
+        
+        setLivePortfolio(updated);
+        const totalValue = updated.reduce((sum, h) => sum + h.totalValue, 0);
+        const totalGain = updated.reduce((sum, h) => sum + h.gainLoss, 0);
+        setPortfolioValue(totalValue);
+        setPortfolioGain(totalGain);
+        
+        console.log('💰 Portfolio updated:', {
+          stocks: updated.length,
+          totalValue: totalValue.toFixed(2),
+          totalGain: totalGain.toFixed(2)
+        });
+      } catch (error) {
+        console.error('❌ Error updating portfolio:', error);
       }
-    };
-
-    updatePortfolioPrices();
-    const interval = setInterval(updatePortfolioPrices, 5000); // Update every 5 seconds for demo
-    return () => clearInterval(interval);
+    }
   }, [state.portfolio]);
+
+  // FIXED: Update prices on portfolio change
+  useEffect(() => {
+    console.log('📊 Portfolio state changed:', state.portfolio);
+    updatePortfolioPrices();
+  }, [state.portfolio, updatePortfolioPrices]);
+
+  // Update live portfolio prices every 5 seconds
+  useEffect(() => {
+    if (state.portfolio && state.portfolio.length > 0) {
+      const interval = setInterval(() => {
+        updatePortfolioPrices();
+      }, 5000); // Update every 5 seconds for demo
+      
+      return () => clearInterval(interval);
+    }
+  }, [state.portfolio, updatePortfolioPrices]);
 
   // Calculate monthly expenses
   useEffect(() => {
@@ -148,23 +246,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       setMonthlySubscriptions(total);
     }
   }, [state.billReminders]);
-
-  // CSV Upload Handler
-  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const text = e.target?.result as string;
-      // Send to agent
-      const message = `Import this CSV portfolio:\n${text}`;
-      // This will trigger the agent to process it
-      console.log('CSV Data:', text);
-      setShowUploadModal(false);
-    };
-    reader.readAsText(file);
-  };
 
   // Generative UI for tools
   useCopilotAction({
@@ -225,13 +306,20 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
               <h2 className="text-2xl font-bold mb-4 text-gray-800">📊 Import Portfolio CSV</h2>
               <div className="mb-4">
-                <p className="text-gray-600 mb-2">Upload a CSV file with format:</p>
+                <p className="text-gray-600 mb-2">Upload a CSV file with this exact format:</p>
                 <div className="bg-gray-100 p-3 rounded font-mono text-sm mb-4">
                   Symbol,Quantity,Price<br/>
-                  AAPL,10,150.00<br/>
-                  MSFT,5,400.00<br/>
-                  GOOGL,3,2800.00
+                  AAPL,10,271.00<br/>
+                  MSFT,5,526.00<br/>
+                  GOOGL,3,178.50<br/>
+                  TSLA,2,245.00
                 </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  • First line must be the header<br/>
+                  • No spaces around commas<br/>
+                  • Use stock ticker symbols (AAPL, MSFT, etc.)<br/>
+                  • Price is your purchase price per share
+                </p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -269,7 +357,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             </div>
             <div className={`text-sm font-semibold ${portfolioGain >= 0 ? 'text-green-300' : 'text-red-300'}`}>
               {portfolioGain >= 0 ? '↑' : '↓'} ${Math.abs(portfolioGain).toFixed(2)} 
-              {portfolioValue > 0 && ` (${((portfolioGain / portfolioValue) * 100).toFixed(2)}%)`}
+              {portfolioValue > 0 && ` (${((portfolioGain / (portfolioValue - portfolioGain)) * 100).toFixed(2)}%)`}
             </div>
           </div>
 
@@ -351,7 +439,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               ) : (
                 <div className="text-center py-8 text-white/70">
                   <p className="mb-2">No holdings yet</p>
-                  <p className="text-sm">Ask me: "Add 10 shares of Apple at $150"</p>
+                  <p className="text-sm">Ask me: "Add 10 shares of Apple at $271"</p>
+                  <p className="text-sm mt-2">Or click "Import CSV" above</p>
                 </div>
               )}
             </div>
@@ -466,7 +555,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
         {(!state.portfolio || state.portfolio.length === 0) &&
          (!state.expenses || state.expenses.length === 0) &&
          (!state.billReminders || state.billReminders.length === 0) && (
-          <div className="bg-white/20 backdrop-blur-md p-8 rounded-xl shadow-lg text-center">
+          <div className="bg-white/20 backdrop-blur-md p-8 rounded-xl shadow-lg text-center mt-6">
             <h2 className="text-2xl font-bold text-white mb-3">👋 Welcome to FinanceAI!</h2>
             <p className="text-white/80 mb-4">Start by asking me about stocks or managing your finances</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-white/70 text-left max-w-2xl mx-auto">
@@ -476,7 +565,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               </div>
               <div className="bg-white/10 p-3 rounded">
                 <div className="font-semibold mb-1">💼 Add to Portfolio</div>
-                <div>"Add 5 Apple shares at $175"</div>
+                <div>"Add 5 Apple shares at $271"</div>
               </div>
               <div className="bg-white/10 p-3 rounded">
                 <div className="font-semibold mb-1">💸 Track Expenses</div>
@@ -494,7 +583,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
   );
 }
 
-// Keep previous card components exactly as they were with the null checks
+// Stock Analysis Card
 function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
   if (status !== "complete" || !result || !result.currentPrice) {
     return (
@@ -555,6 +644,7 @@ function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
   );
 }
 
+// Stock Research Card
 function StockResearchCard({ query, themeColor, result, status }: any) {
   if (status !== "complete" || !result || !result.analysis) {
     return (
@@ -623,6 +713,7 @@ function StockResearchCard({ query, themeColor, result, status }: any) {
   );
 }
 
+// Portfolio Update Card
 function PortfolioUpdateCard({ action, themeColor, result, status }: any) {
   if (status !== "complete" || !result) {
     return (

@@ -14,7 +14,7 @@ export const mastra = new Mastra({
     server
   },
   storage: new LibSQLStore({
-    url: ":memory:"
+    url: "file:finance.db" 
   }),
   logger: new ConsoleLogger({
     level: LOG_LEVEL,
