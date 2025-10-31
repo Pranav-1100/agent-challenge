@@ -27,6 +27,7 @@
     "@mastra/libsql": "0.15.0",
     "@mastra/mcp": "^0.13.4",
     "@mastra/memory": "0.15.4",
+    "cheerio": "^1.1.2",
     "dotenv": "^17.2.3",
     "libsql": "^0.5.22",
     "mastra": "0.13.4",
@@ -34,6 +35,7 @@
     "ollama-ai-provider-v2": "^1.5.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "yahoo-finance2": "^3.10.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {

@@ -2,22 +2,21 @@
 
 import { useCoAgent, useCopilotAction } from "@copilotkit/react-core";
 import { CopilotKitCSSProperties, CopilotSidebar } from "@copilotkit/react-ui";
-import { useState } from "react";
-import { AgentState as AgentStateSchema } from "@/mastra/agents";
+import { useState, useEffect, useRef } from "react";
+import { FinanceAgentState } from "@/mastra/agents";
 import { z } from "zod";
-import { WeatherToolResult } from "@/mastra/tools";
+import { StockAnalysisResult, StockResearchResult } from "@/mastra/tools";
 
-type AgentState = z.infer<typeof AgentStateSchema>;
+type AgentState = z.infer<typeof FinanceAgentState>;
 
-export default function CopilotKitPage() {
-  const [themeColor, setThemeColor] = useState("#6366f1");
+export default function FinanceApp() {
+  const [themeColor, setThemeColor] = useState("#10b981"); // Green for finance
 
-  // 🪁 Frontend Actions: https://docs.copilotkit.ai/guides/frontend-actions
   useCopilotAction({
     name: "setThemeColor",
     parameters: [{
       name: "themeColor",
-      description: "The theme color to set. Make sure to pick nice colors.",
+      description: "The theme color to set.",
       required: true,
     }],
     handler({ themeColor }) {
@@ -27,168 +26,528 @@ export default function CopilotKitPage() {
 
   return (
     <main style={{ "--copilot-kit-primary-color": themeColor } as CopilotKitCSSProperties}>
-      <YourMainContent themeColor={themeColor} />
+      <MainDashboard themeColor={themeColor} />
       <CopilotSidebar
         clickOutsideToClose={false}
         defaultOpen={true}
         labels={{
-          title: "Popup Assistant",
-          initial: "👋 Hi, there! You're chatting with an agent. This agent comes with a few tools to get you started.\n\nFor example you can try:\n- **Frontend Tools**: \"Set the theme to orange\"\n- **Shared State**: \"Write a proverb about AI\"\n- **Generative UI**: \"Get the weather in SF\"\n\nAs you interact with the agent, you'll see the UI update in real-time to reflect the agent's **state**, **tool calls**, and **progress**."
+          title: "FinanceAI Assistant",
+          initial: `💰 Welcome to FinanceAI! Your AI-powered financial assistant.
+
+**Quick Start:**
+- 📊 "Analyze Apple stock" or "What's AAPL price?"
+- 🔍 "Should I buy Tesla stock?" (detailed research)
+- 💼 "Add 10 shares of Microsoft at $300"
+- 🔔 "Alert me if Apple drops below $160"
+- 💸 "I spent $45 on lunch"
+- 📝 "Add Netflix subscription $15 monthly"
+- 📈 "Show my portfolio performance"
+
+I can help with stocks, portfolio tracking, investment research, expenses, and subscriptions!`
         }}
       />
     </main>
   );
 }
 
-function YourMainContent({ themeColor }: { themeColor: string }) {
-  // 🪁 Shared State: https://docs.copilotkit.ai/coagents/shared-state
+function MainDashboard({ themeColor }: { themeColor: string }) {
   const { state, setState } = useCoAgent<AgentState>({
-    name: "weatherAgent",
+    name: "financeAgent",
     initialState: {
-      proverbs: [
-        "CopilotKit may be new, but its the best thing since sliced bread.",
-      ],
-    },
-  })
-
-  //🪁 Generative UI: https://docs.copilotkit.ai/coagents/generative-ui
-  useCopilotAction({
-    name: "weatherTool",
-    description: "Get the weather for a given location.",
-    available: "frontend",
-    parameters: [
-      { name: "location", type: "string", required: true },
-    ],
-    render: ({ args, result, status }) => {
-      return <WeatherCard
-        location={args.location}
-        themeColor={themeColor}
-        result={result}
-        status={status}
-      />
+      portfolio: [],
+      alerts: [],
+      expenses: [],
+      watchlist: [],
+      billReminders: [],
     },
   });
 
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [livePortfolio, setLivePortfolio] = useState<any[]>([]);
+  const [portfolioValue, setPortfolioValue] = useState(0);
+  const [portfolioGain, setPortfolioGain] = useState(0);
+  const [monthlyExpenses, setMonthlyExpenses] = useState(0);
+  const [monthlySubscriptions, setMonthlySubscriptions] = useState(0);
+
+  // Update live portfolio prices every 5 seconds (demo) - in production would be 5 minutes
+  useEffect(() => {
+    const updatePortfolioPrices = async () => {
+      if (state.portfolio && state.portfolio.length > 0) {
+        try {
+          const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
+          const updated = await Promise.all(
+            state.portfolio.map(async (holding) => {
+              try {
+                const response = await fetch(`https://finnhub.io/api/v1/quote?symbol=${holding.symbol}&token=${apiKey}`);
+                const data = await response.json();
+                const currentPrice = data.c || holding.purchasePrice;
+                const totalValue = currentPrice * holding.quantity;
+                const totalCost = holding.purchasePrice * holding.quantity;
+                const gainLoss = totalValue - totalCost;
+                const gainLossPercent = ((gainLoss / totalCost) * 100);
+                
+                return {
+                  ...holding,
+                  currentPrice,
+                  totalValue,
+                  gainLoss,
+                  gainLossPercent,
+                };
+              } catch {
+                return {
+                  ...holding,
+                  currentPrice: holding.purchasePrice,
+                  totalValue: holding.purchasePrice * holding.quantity,
+                  gainLoss: 0,
+                  gainLossPercent: 0,
+                };
+              }
+            })
+          );
+          
+          setLivePortfolio(updated);
+          const totalValue = updated.reduce((sum, h) => sum + h.totalValue, 0);
+          const totalGain = updated.reduce((sum, h) => sum + h.gainLoss, 0);
+          setPortfolioValue(totalValue);
+          setPortfolioGain(totalGain);
+        } catch (error) {
+          console.error('Error updating portfolio:', error);
+        }
+      }
+    };
+
+    updatePortfolioPrices();
+    const interval = setInterval(updatePortfolioPrices, 5000); // Update every 5 seconds for demo
+    return () => clearInterval(interval);
+  }, [state.portfolio]);
+
+  // Calculate monthly expenses
+  useEffect(() => {
+    if (state.expenses && state.expenses.length > 0) {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      const monthlyTotal = state.expenses
+        .filter(exp => {
+          const expDate = new Date(exp.date);
+          return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
+        })
+        .reduce((sum, exp) => sum + exp.amount, 0);
+      
+      setMonthlyExpenses(monthlyTotal);
+    }
+  }, [state.expenses]);
+
+  // Calculate monthly subscriptions
+  useEffect(() => {
+    if (state.billReminders && state.billReminders.length > 0) {
+      const total = state.billReminders.reduce((sum, bill) => sum + bill.amount, 0);
+      setMonthlySubscriptions(total);
+    }
+  }, [state.billReminders]);
+
+  // CSV Upload Handler
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      // Send to agent
+      const message = `Import this CSV portfolio:\n${text}`;
+      // This will trigger the agent to process it
+      console.log('CSV Data:', text);
+      setShowUploadModal(false);
+    };
+    reader.readAsText(file);
+  };
+
+  // Generative UI for tools
   useCopilotAction({
-    name: "updateWorkingMemory",
+    name: "stockAnalyzerTool",
+    description: "Display stock analysis results",
     available: "frontend",
-    render: ({ args }) => {
-      return <div style={{ backgroundColor: themeColor }} className="rounded-2xl max-w-md w-full text-white p-4">
-        <p>✨ Memory updated</p>
-        <details className="mt-2">
-          <summary className="cursor-pointer text-white">See updates</summary>
-          <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }} className="overflow-x-auto text-sm bg-white/20 p-4 rounded-lg mt-2">
-            {JSON.stringify(args, null, 2)}
-          </pre>
-        </details>
-      </div>
-    },
+    parameters: [{ name: "symbol", type: "string", required: true }],
+    render: ({ args, result, status }) => (
+      <StockAnalysisCard symbol={args.symbol} themeColor={themeColor} result={result as StockAnalysisResult} status={status} />
+    ),
   });
+
+  useCopilotAction({
+    name: "smartStockResearchTool",
+    description: "Display comprehensive stock research",
+    available: "frontend",
+    parameters: [{ name: "query", type: "string", required: true }],
+    render: ({ args, result, status }) => (
+      <StockResearchCard query={args.query} themeColor={themeColor} result={result as StockResearchResult} status={status} />
+    ),
+  });
+
+  useCopilotAction({
+    name: "portfolioManagerTool",
+    description: "Display portfolio updates",
+    available: "frontend",
+    render: ({ args, result, status }) => (
+      <PortfolioUpdateCard action={args.action} themeColor={themeColor} result={result} status={status} />
+    ),
+  });
+
+  const totalMonthly = monthlyExpenses + monthlySubscriptions;
 
   return (
-    <div
-      style={{ backgroundColor: themeColor }}
-      className="h-screen w-screen flex justify-center items-center flex-col transition-colors duration-300"
-    >
-      <div className="bg-white/20 backdrop-blur-md p-8 rounded-2xl shadow-xl max-w-2xl w-full">
-        <h1 className="text-4xl font-bold text-white mb-2 text-center">Proverbs</h1>
-        <p className="text-gray-200 text-center italic mb-6">This is a demonstrative page, but it could be anything you want! 🪁</p>
-        <hr className="border-white/20 my-6" />
-        <div className="flex flex-col gap-3">
-          {state.proverbs?.map((proverb, index) => (
-            <div
-              key={index}
-              className="bg-white/15 p-4 rounded-xl text-white relative group hover:bg-white/20 transition-all"
-            >
-              <p className="pr-8">{proverb}</p>
+    <div style={{ backgroundColor: themeColor }} className="min-h-screen w-screen flex justify-center items-start py-8 transition-colors duration-300">
+      <div className="max-w-6xl w-full px-4">
+        
+        {/* Header */}
+        <div className="bg-white/20 backdrop-blur-md p-6 rounded-2xl shadow-xl mb-6">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex-1"></div>
+            <h1 className="text-4xl font-bold text-white text-center flex-1">💰 FinanceAI Dashboard</h1>
+            <div className="flex-1 flex justify-end">
               <button
-                onClick={() => setState({
-                  ...state,
-                  proverbs: state.proverbs?.filter((_, i) => i !== index),
-                })}
-                className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity 
-                  bg-red-500 hover:bg-red-600 text-white rounded-full h-6 w-6 flex items-center justify-center"
+                onClick={() => setShowUploadModal(true)}
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2"
               >
-                ✕
+                📊 Import CSV
               </button>
             </div>
-          ))}
+          </div>
+          <p className="text-gray-200 text-center italic">Your AI-powered financial command center</p>
         </div>
-        {state.proverbs?.length === 0 && <p className="text-center text-white/80 italic my-8">
-          No proverbs yet. Ask the assistant to add some!
-        </p>}
+
+        {/* CSV Upload Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowUploadModal(false)}>
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-2xl font-bold mb-4 text-gray-800">📊 Import Portfolio CSV</h2>
+              <div className="mb-4">
+                <p className="text-gray-600 mb-2">Upload a CSV file with format:</p>
+                <div className="bg-gray-100 p-3 rounded font-mono text-sm mb-4">
+                  Symbol,Quantity,Price<br/>
+                  AAPL,10,150.00<br/>
+                  MSFT,5,400.00<br/>
+                  GOOGL,3,2800.00
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCSVUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-semibold transition"
+                >
+                  Choose CSV File
+                </button>
+              </div>
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-semibold transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {/* Portfolio Value Card */}
+          <div className="bg-white/20 backdrop-blur-md p-5 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-white/80 text-sm font-semibold">Portfolio Value</h3>
+              <span className="text-2xl">📊</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              ${portfolioValue.toFixed(2)}
+            </div>
+            <div className={`text-sm font-semibold ${portfolioGain >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+              {portfolioGain >= 0 ? '↑' : '↓'} ${Math.abs(portfolioGain).toFixed(2)} 
+              {portfolioValue > 0 && ` (${((portfolioGain / portfolioValue) * 100).toFixed(2)}%)`}
+            </div>
+          </div>
+
+          {/* Monthly Expenses Card */}
+          <div className="bg-white/20 backdrop-blur-md p-5 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-white/80 text-sm font-semibold">Monthly Expenses</h3>
+              <span className="text-2xl">💸</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              ${monthlyExpenses.toFixed(2)}
+            </div>
+            <div className="text-sm text-white/70">
+              This month's spending
+            </div>
+          </div>
+
+          {/* Subscriptions Card */}
+          <div className="bg-white/20 backdrop-blur-md p-5 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-white/80 text-sm font-semibold">Subscriptions</h3>
+              <span className="text-2xl">📝</span>
+            </div>
+            <div className="text-3xl font-bold text-white mb-1">
+              ${monthlySubscriptions.toFixed(2)}
+            </div>
+            <div className="text-sm text-white/70">
+              {state.billReminders?.length || 0} active subscriptions
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Left Column */}
+          <div className="space-y-6">
+            
+            {/* Portfolio Holdings */}
+            <div className="bg-white/20 backdrop-blur-md p-6 rounded-xl shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white">📈 Portfolio</h2>
+                {livePortfolio.length > 0 && (
+                  <span className="text-xs text-white/60">Live • Updates every 5 sec</span>
+                )}
+              </div>
+              
+              {livePortfolio.length > 0 ? (
+                <div className="space-y-3">
+                  {livePortfolio.map((holding, index) => {
+                    const isPositive = holding.gainLoss >= 0;
+                    return (
+                      <div key={index} className="bg-white/10 p-4 rounded-lg hover:bg-white/15 transition">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <div className="text-white font-bold text-lg">{holding.symbol}</div>
+                            <div className="text-white/70 text-sm">{holding.quantity} shares</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-semibold">
+                              ${holding.currentPrice.toFixed(2)}
+                            </div>
+                            <div className="text-white/60 text-xs">
+                              Bought: ${holding.purchasePrice.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                          <div className="text-white/80 text-sm">
+                            Value: ${holding.totalValue.toFixed(2)}
+                          </div>
+                          <div className={`text-sm font-semibold ${isPositive ? 'text-green-300' : 'text-red-300'}`}>
+                            {isPositive ? '↑' : '↓'} ${Math.abs(holding.gainLoss).toFixed(2)} ({holding.gainLossPercent.toFixed(2)}%)
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/70">
+                  <p className="mb-2">No holdings yet</p>
+                  <p className="text-sm">Ask me: "Add 10 shares of Apple at $150"</p>
+                </div>
+              )}
+            </div>
+
+            {/* Alerts */}
+            {state.alerts && state.alerts.length > 0 && (
+              <div className="bg-white/20 backdrop-blur-md p-6 rounded-xl shadow-lg">
+                <h2 className="text-2xl font-bold text-white mb-4">🔔 Price Alerts</h2>
+                <div className="space-y-2">
+                  {state.alerts.map((alert, index) => (
+                    <div key={index} className="bg-yellow-500/20 border border-yellow-500/40 p-3 rounded-lg">
+                      <div className="text-white font-semibold">
+                        {alert.symbol} {alert.condition} ${alert.targetPrice}
+                      </div>
+                      <div className="text-white/70 text-sm">
+                        Will notify when triggered
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            
+            {/* Subscriptions / Bill Reminders */}
+            <div className="bg-white/20 backdrop-blur-md p-6 rounded-xl shadow-lg">
+              <h2 className="text-2xl font-bold text-white mb-4">📝 Subscriptions</h2>
+              
+              {state.billReminders && state.billReminders.length > 0 ? (
+                <div className="space-y-3">
+                  {state.billReminders.map((bill, index) => (
+                    <div key={index} className="bg-white/10 p-4 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-white font-semibold">{bill.name}</div>
+                          <div className="text-white/70 text-sm">Due: {bill.dueDay}th of month</div>
+                        </div>
+                        <div className="text-white font-bold text-lg">
+                          ${bill.amount.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t border-white/20">
+                    <div className="flex justify-between text-white">
+                      <span className="font-semibold">Monthly Total:</span>
+                      <span className="font-bold">${monthlySubscriptions.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/70">
+                  <p className="mb-2">No subscriptions tracked</p>
+                  <p className="text-sm">Ask me: "Add Netflix subscription $15 monthly"</p>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Expenses */}
+            <div className="bg-white/20 backdrop-blur-md p-6 rounded-xl shadow-lg">
+              <h2 className="text-2xl font-bold text-white mb-4">💸 Recent Expenses</h2>
+              
+              {state.expenses && state.expenses.length > 0 ? (
+                <div className="space-y-2">
+                  {state.expenses.slice(-5).reverse().map((expense, index) => (
+                    <div key={index} className="bg-white/10 p-3 rounded-lg flex justify-between items-center">
+                      <div>
+                        <div className="text-white font-semibold capitalize">{expense.category}</div>
+                        <div className="text-white/70 text-sm">{expense.description}</div>
+                        <div className="text-white/60 text-xs">{new Date(expense.date).toLocaleDateString()}</div>
+                      </div>
+                      <div className="text-white font-bold">
+                        ${expense.amount.toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t border-white/20">
+                    <div className="flex justify-between text-white">
+                      <span className="font-semibold">This Month:</span>
+                      <span className="font-bold">${monthlyExpenses.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-white/70">
+                  <p className="mb-2">No expenses tracked</p>
+                  <p className="text-sm">Ask me: "I spent $45 on lunch"</p>
+                </div>
+              )}
+            </div>
+
+            {/* Watchlist */}
+            {state.watchlist && state.watchlist.length > 0 && (
+              <div className="bg-white/20 backdrop-blur-md p-6 rounded-xl shadow-lg">
+                <h2 className="text-2xl font-bold text-white mb-4">⭐ Watchlist</h2>
+                <div className="flex flex-wrap gap-2">
+                  {state.watchlist.map((symbol, index) => (
+                    <div key={index} className="bg-white/15 px-4 py-2 rounded-full text-white font-semibold hover:bg-white/25 transition cursor-pointer">
+                      {symbol}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Empty State */}
+        {(!state.portfolio || state.portfolio.length === 0) &&
+         (!state.expenses || state.expenses.length === 0) &&
+         (!state.billReminders || state.billReminders.length === 0) && (
+          <div className="bg-white/20 backdrop-blur-md p-8 rounded-xl shadow-lg text-center">
+            <h2 className="text-2xl font-bold text-white mb-3">👋 Welcome to FinanceAI!</h2>
+            <p className="text-white/80 mb-4">Start by asking me about stocks or managing your finances</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-white/70 text-left max-w-2xl mx-auto">
+              <div className="bg-white/10 p-3 rounded">
+                <div className="font-semibold mb-1">📊 Stock Analysis</div>
+                <div>"Analyze Tesla stock"</div>
+              </div>
+              <div className="bg-white/10 p-3 rounded">
+                <div className="font-semibold mb-1">💼 Add to Portfolio</div>
+                <div>"Add 5 Apple shares at $175"</div>
+              </div>
+              <div className="bg-white/10 p-3 rounded">
+                <div className="font-semibold mb-1">💸 Track Expenses</div>
+                <div>"I spent $50 on groceries"</div>
+              </div>
+              <div className="bg-white/10 p-3 rounded">
+                <div className="font-semibold mb-1">📝 Add Subscription</div>
+                <div>"Add Spotify $10 monthly"</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// Weather card component where the location and themeColor are based on what the agent
-// sets via tool calls.
-function WeatherCard({
-  location,
-  themeColor,
-  result,
-  status
-}: {
-  location?: string,
-  themeColor: string,
-  result: WeatherToolResult,
-  status: "inProgress" | "executing" | "complete"
-}) {
-  if (status !== "complete") {
+// Keep previous card components exactly as they were with the null checks
+function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
+  if (status !== "complete" || !result || !result.currentPrice) {
     return (
-      <div
-        className="rounded-xl shadow-xl mt-6 mb-4 max-w-md w-full"
-        style={{ backgroundColor: themeColor }}
-      >
+      <div className="rounded-xl shadow-xl mt-4 mb-4 max-w-md w-full" style={{ backgroundColor: themeColor }}>
         <div className="bg-white/20 p-4 w-full">
-          <p className="text-white animate-pulse">Loading weather for {location}...</p>
+          <p className="text-white animate-pulse">📊 Analyzing {symbol || 'stock'}...</p>
         </div>
       </div>
-    )
+    );
   }
 
+  const isPositive = (result.changePercent || 0) >= 0;
+
   return (
-    <div
-      style={{ backgroundColor: themeColor }}
-      className="rounded-xl shadow-xl mt-6 mb-4 max-w-md w-full"
-    >
-      <div className="bg-white/20 p-4 w-full">
-        <div className="flex items-center justify-between">
+    <div style={{ backgroundColor: themeColor }} className="rounded-xl shadow-xl mt-4 mb-4 max-w-md w-full">
+      <div className="bg-white/20 p-5 w-full">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-xl font-bold text-white capitalize">{location}</h3>
-            <p className="text-white">Current Weather</p>
+            <h3 className="text-xl font-bold text-white">{result.symbol}</h3>
+            <p className="text-white/80 text-sm">{result.name}</p>
           </div>
-          <WeatherIcon conditions={result?.conditions} />
-        </div>
-
-        <div className="mt-4 flex items-end justify-between">
-          <div className="text-3xl font-bold text-white">
-            <span className="">
-              {result?.temperature}° C
-            </span>
-            <span className="text-sm text-white/50">
-              {" / "}
-              {((result?.temperature * 9) / 5 + 32).toFixed(1)}° F
-            </span>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-white">${result.currentPrice.toFixed(2)}</div>
+            {result.change !== undefined && result.changePercent !== undefined && (
+              <div className={`text-sm font-semibold ${isPositive ? 'text-green-200' : 'text-red-200'}`}>
+                {isPositive ? '↑' : '↓'} {Math.abs(result.change).toFixed(2)} ({Math.abs(result.changePercent).toFixed(2)}%)
+              </div>
+            )}
           </div>
-          <div className="text-sm text-white">{result?.conditions}</div>
         </div>
-
-        <div className="mt-4 pt-4 border-t border-white">
-          <div className="grid grid-cols-3 gap-2 text-center">
+        {result.marketCap && (
+          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/20">
             <div>
-              <p className="text-white text-xs">Humidity</p>
-              <p className="text-white font-medium">{result?.humidity}%</p>
+              <p className="text-white/70 text-xs">Market Cap</p>
+              <p className="text-white font-semibold text-sm">{result.marketCap}</p>
             </div>
-            <div>
-              <p className="text-white text-xs">Wind</p>
-              <p className="text-white font-medium">{result?.windSpeed} mph</p>
-            </div>
-            <div>
-              <p className="text-white text-xs">Feels Like</p>
-              <p className="text-white font-medium">{result?.feelsLike}°</p>
-            </div>
+            {result.peRatio && (
+              <div>
+                <p className="text-white/70 text-xs">P/E Ratio</p>
+                <p className="text-white font-semibold text-sm">{result.peRatio.toFixed(2)}</p>
+              </div>
+            )}
+            {result.week52High && (
+              <div>
+                <p className="text-white/70 text-xs">52W High</p>
+                <p className="text-white font-semibold text-sm">${result.week52High.toFixed(2)}</p>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-white/20">
+          <div className="bg-white/20 px-3 py-2 rounded-lg">
+            <p className="text-white font-semibold text-sm">💡 {result.recommendation}</p>
           </div>
         </div>
       </div>
@@ -196,61 +555,88 @@ function WeatherCard({
   );
 }
 
-function WeatherIcon({ conditions }: { conditions: string }) {
-  if (!conditions) return null;
-
-  if (
-    conditions.toLowerCase().includes("clear") ||
-    conditions.toLowerCase().includes("sunny")
-  ) {
-    return <SunIcon />;
+function StockResearchCard({ query, themeColor, result, status }: any) {
+  if (status !== "complete" || !result || !result.analysis) {
+    return (
+      <div className="rounded-xl shadow-xl mt-4 mb-4 max-w-2xl w-full" style={{ backgroundColor: themeColor }}>
+        <div className="bg-white/20 p-4 w-full"><p className="text-white animate-pulse">🔍 Researching {query || 'stock'}...</p></div>
+      </div>
+    );
   }
 
-  if (
-    conditions.toLowerCase().includes("rain") ||
-    conditions.toLowerCase().includes("drizzle") ||
-    conditions.toLowerCase().includes("snow") ||
-    conditions.toLowerCase().includes("thunderstorm")
-  ) {
-    return <RainIcon />;
-  }
+  const riskColors: Record<string, string> = { 
+    'LOW': 'bg-green-500', 
+    'MEDIUM': 'bg-yellow-500', 
+    'HIGH': 'bg-orange-500', 
+    'VERY HIGH': 'bg-red-500' 
+  };
 
-  if (
-    conditions.toLowerCase().includes("fog") ||
-    conditions.toLowerCase().includes("cloud") ||
-    conditions.toLowerCase().includes("overcast")
-  ) {
-    return <CloudIcon />;
-  }
-
-  return <CloudIcon />;
-}
-
-// Simple sun icon for the weather card
-function SunIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-14 h-14 text-yellow-200">
-      <circle cx="12" cy="12" r="5" />
-      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeWidth="2" stroke="currentColor" />
-    </svg>
+    <div style={{ backgroundColor: themeColor }} className="rounded-xl shadow-xl mt-4 mb-4 max-w-2xl w-full">
+      <div className="bg-white/20 p-5 w-full">
+        <div className="mb-4">
+          <h3 className="text-2xl font-bold text-white">{result.name}</h3>
+          {result.currentPrice && result.currentPrice > 0 && <p className="text-white/80 text-lg">${result.currentPrice.toFixed(2)}</p>}
+        </div>
+        <div className="mb-4">
+          <div className={`inline-block px-3 py-1 rounded-full text-white text-sm font-semibold ${riskColors[result.riskLevel]}`}>
+            ⚠️ Risk: {result.riskLevel}
+          </div>
+        </div>
+        {result.pros && result.pros.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-white font-semibold mb-2">✅ PROS</h4>
+            <ul className="list-disc list-inside text-white/90 text-sm space-y-1">
+              {result.pros.map((pro: string, idx: number) => <li key={idx}>{pro}</li>)}
+            </ul>
+          </div>
+        )}
+        {result.cons && result.cons.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-white font-semibold mb-2">❌ CONS</h4>
+            <ul className="list-disc list-inside text-white/90 text-sm space-y-1">
+              {result.cons.map((con: string, idx: number) => <li key={idx}>{con}</li>)}
+            </ul>
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-white/20">
+          <div className="bg-white/20 p-3 rounded-lg">
+            <p className="text-white font-bold mb-1">💡 Recommendation: {result.recommendation}</p>
+            <p className="text-white/90 text-sm">{result.reasoning}</p>
+          </div>
+        </div>
+        {result.news && result.news.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-white font-semibold mb-2">📰 Recent News</h4>
+            <div className="space-y-2">
+              {result.news.slice(0, 3).map((article: any, idx: number) => (
+                <div key={idx} className="bg-white/10 p-2 rounded text-white/90 text-xs">
+                  <p className="font-semibold">{article.title}</p>
+                  <p className="text-white/70">{article.source}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-function RainIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-14 h-14 text-blue-200">
-      {/* Cloud */}
-      <path d="M7 15a4 4 0 0 1 0-8 5 5 0 0 1 10 0 4 4 0 0 1 0 8H7z" fill="currentColor" opacity="0.8" />
-      {/* Rain drops */}
-      <path d="M8 18l2 4M12 18l2 4M16 18l2 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
-    </svg>
-  );
-}
+function PortfolioUpdateCard({ action, themeColor, result, status }: any) {
+  if (status !== "complete" || !result) {
+    return (
+      <div className="rounded-xl shadow-xl mt-4 mb-4 max-w-md w-full" style={{ backgroundColor: themeColor }}>
+        <div className="bg-white/20 p-4 w-full"><p className="text-white animate-pulse">💼 Updating portfolio...</p></div>
+      </div>
+    );
+  }
 
-function CloudIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-14 h-14 text-gray-200">
-      <path d="M7 15a4 4 0 0 1 0-8 5 5 0 0 1 10 0 4 4 0 0 1 0 8H7z" fill="currentColor" />
-    </svg>
+    <div style={{ backgroundColor: themeColor }} className="rounded-xl shadow-xl mt-4 mb-4 max-w-md w-full">
+      <div className="bg-white/20 p-4 w-full">
+        <p className="text-white font-semibold">✅ {result.message || 'Portfolio updated successfully'}</p>
+      </div>
+    </div>
   );
 }

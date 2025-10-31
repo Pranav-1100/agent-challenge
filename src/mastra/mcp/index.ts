@@ -1,13 +1,34 @@
-import { MCPServer } from "@mastra/mcp"
-import { weatherTool } from "../tools";
-import { weatherAgent } from "../agents";
+import { MCPServer } from "@mastra/mcp";
+import { 
+  portfolioManagerTool,
+  stockAnalyzerTool,
+  smartStockResearchTool,
+  smartAlertsTool,
+  expenseTrackerTool,
+  stateUpdaterTool,
+  csvImporterTool,
+  rebalancingAnalyzerTool,
+  benchmarkComparisonTool,
+  portfolioAdvisorTool,
+  alertCheckerTool,
+} from "../tools";
+import { financeAgent } from "../agents";
 
 export const server = new MCPServer({
-  name: "My Custom Server",
-  version: "1.0.0",
-  tools: { weatherTool },
-  agents: { weatherAgent }, // this agent will become tool "ask_weatherAgent"
-  // workflows: {
-  // dataProcessingWorkflow, // this workflow will become tool "run_dataProcessingWorkflow"
-  // }
+  name: "FinanceAI Server",
+  version: "2.0.0",
+  tools: { 
+    portfolioManagerTool,
+    stockAnalyzerTool,
+    smartStockResearchTool,
+    smartAlertsTool,
+    expenseTrackerTool,
+    stateUpdaterTool,
+    csvImporterTool,
+    rebalancingAnalyzerTool,
+    benchmarkComparisonTool,
+    portfolioAdvisorTool,
+    alertCheckerTool,
+  },
+  agents: { financeAgent },
 });
