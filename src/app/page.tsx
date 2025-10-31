@@ -6,8 +6,45 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { FinanceAgentState } from "@/mastra/agents";
 import { z } from "zod";
 import { StockAnalysisResult, StockResearchResult } from "@/mastra/tools";
+import Image from "next/image";
 
 type AgentState = z.infer<typeof FinanceAgentState>;
+
+interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  urlToImage?: string;
+  source: { name: string };
+  publishedAt: string;
+}
+
+interface StockRecommendation {
+  symbol: string;
+  name: string;
+  sector: string;
+  currentPrice: number;
+  changePercent: number;
+  action: string;
+  reason: string;
+}
+
+interface LivePortfolioItem {
+  symbol: string;
+  quantity: number;
+  purchasePrice: number;
+  currentPrice: number;
+  totalValue: number;
+  totalCost: number;
+  gainLoss: number;
+  gainLossPercent: number;
+}
+
+interface CSVStock {
+  symbol: string;
+  quantity: number;
+  purchasePrice: number;
+}
 
 export default function FinanceApp() {
   const [themeColor, setThemeColor] = useState("#C9A15C");
@@ -80,16 +117,14 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
 
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
-  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [latestNews, setLatestNews] = useState<any[]>([]);
-  const [stockRecommendations, setStockRecommendations] = useState<any[]>([]);
-  const [relatedNews, setRelatedNews] = useState<any[]>([]);
+  const [latestNews, setLatestNews] = useState<NewsArticle[]>([]);
+  const [stockRecommendations, setStockRecommendations] = useState<StockRecommendation[]>([]);
+  const [relatedNews, setRelatedNews] = useState<NewsArticle[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [livePortfolio, setLivePortfolio] = useState<any[]>([]);
+  const [livePortfolio, setLivePortfolio] = useState<LivePortfolioItem[]>([]);
   const [portfolioValue, setPortfolioValue] = useState(0);
   const [portfolioGain, setPortfolioGain] = useState(0);
   const [portfolioCostBasis, setPortfolioCostBasis] = useState(0);
@@ -110,9 +145,9 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       console.log('📄 CSV Content:', text);
       
       setUploadStatus("🔍 Parsing stocks...");
-      
+
       const lines = text.trim().split('\n');
-      const newStocks: any[] = [];
+      const newStocks: CSVStock[] = [];
       
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -138,10 +173,13 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       
       if (newStocks.length > 0) {
         setUploadStatus(`✅ Importing ${newStocks.length} stocks...`);
-        
-        setState((prev: any) => ({
-          ...prev,
-          portfolio: [...(prev.portfolio || []), ...newStocks]
+
+        setState((prev) => ({
+          portfolio: [...(prev?.portfolio || []), ...newStocks],
+          alerts: prev?.alerts || [],
+          expenses: prev?.expenses || [],
+          watchlist: prev?.watchlist || [],
+          billReminders: prev?.billReminders || [],
         }));
         
         setTimeout(() => {
@@ -174,7 +212,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
 
     setIsAnalyzing(true);
-    setShowAnalysisModal(true);
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
@@ -198,7 +235,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       );
 
       const totalValue = portfolioWithPrices.reduce((sum, h) => sum + (h.currentPrice * h.quantity), 0);
-      const totalCost = portfolioWithPrices.reduce((sum, h) => sum + (h.purchasePrice * h.quantity), 0);
       const numHoldings = portfolioWithPrices.length;
       
       const diversificationScore = Math.min(numHoldings * 20, 100);
@@ -218,20 +254,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       const hasTech = portfolioWithPrices.some(h => techStocks.includes(h.symbol));
       if (!hasTech) recs.push('Consider adding tech stocks for growth potential');
       
-      const overallRating = diversificationScore > 70 && riskScore < 50 ? 'EXCELLENT' :
-                            diversificationScore > 50 && riskScore < 70 ? 'GOOD' :
-                            'NEEDS IMPROVEMENT';
-      
-      setAnalysisResult({
-        overallRating,
-        riskScore: Math.round(riskScore),
-        diversificationScore: Math.round(diversificationScore),
-        recommendations: recs,
-        totalValue,
-        totalCost,
-        numHoldings,
-      });
-      
       setRecommendations(recs);
     } catch (error) {
       console.error('Analysis error:', error);
@@ -241,7 +263,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
   };
 
-  const generateStockRecommendations = async () => {
+  const generateStockRecommendations = useCallback(async () => {
     if (!state.portfolio || state.portfolio.length === 0) return;
 
     try {
@@ -310,9 +332,9 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     } catch (error) {
       console.error('Error generating recommendations:', error);
     }
-  };
+  }, [state.portfolio]);
 
-  const fetchRelatedNews = async () => {
+  const fetchRelatedNews = useCallback(async () => {
     if (!state.portfolio || state.portfolio.length === 0) return;
 
     try {
@@ -332,9 +354,9 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     } catch (error) {
       console.error('Error fetching related news:', error);
     }
-  };
+  }, [state.portfolio]);
 
-  const fetchLatestNews = async () => {
+  const fetchLatestNews = useCallback(async () => {
     try {
       const apiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY || process.env.NEWS_API_KEY;
       if (!apiKey) return;
@@ -348,7 +370,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     } catch (error) {
       console.error('Error fetching news:', error);
     }
-  };
+  }, []);
 
   const updatePortfolioPrices = useCallback(async () => {
     if (!state.portfolio || state.portfolio.length === 0) {
@@ -432,7 +454,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       fetchRelatedNews();
     }
     fetchLatestNews();
-  }, [state.portfolio, updatePortfolioPrices]);
+  }, [state.portfolio, updatePortfolioPrices, generateStockRecommendations, fetchRelatedNews, fetchLatestNews]);
 
   useEffect(() => {
     if (state.portfolio && state.portfolio.length > 0) {
@@ -480,7 +502,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     available: "frontend",
     parameters: [{ name: "symbol", type: "string", required: true }],
     render: ({ args, result, status }) => (
-      <StockAnalysisCard symbol={args.symbol} themeColor={themeColor} result={result as StockAnalysisResult} status={status} />
+      <StockAnalysisCard symbol={args.symbol || ''} themeColor={themeColor} result={result as StockAnalysisResult} status={status} />
     ),
   });
 
@@ -490,7 +512,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     available: "frontend",
     parameters: [{ name: "query", type: "string", required: true }],
     render: ({ args, result, status }) => (
-      <StockResearchCard query={args.query} themeColor={themeColor} result={result as StockResearchResult} status={status} />
+      <StockResearchCard query={args.query || ''} themeColor={themeColor} result={result as StockResearchResult} status={status} />
     ),
   });
 
@@ -498,8 +520,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     name: "portfolioManagerTool",
     description: "Display portfolio updates",
     available: "frontend",
-    render: ({ args, result, status }) => (
-      <PortfolioUpdateCard action={args.action} themeColor={themeColor} result={result} status={status} />
+    render: ({ result, status }) => (
+      <PortfolioUpdateCard themeColor={themeColor} result={result} status={status} />
     ),
   });
 
@@ -509,7 +531,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     available: "frontend",
     parameters: [{ name: "companyName", type: "string", required: true }],
     render: ({ args, result, status }) => (
-      <IPOResearchCard companyName={args.companyName} themeColor={themeColor} result={result} status={status} />
+      <IPOResearchCard companyName={args.companyName || ''} themeColor={themeColor} result={result} status={status} />
     ),
   });
 
@@ -783,8 +805,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   <p className="text-slate-400 text-lg mb-3">No holdings yet</p>
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 max-w-md mx-auto">
                     <p className="text-blue-300 text-sm mb-2 font-semibold">Get started:</p>
-                    <p className="text-blue-400 text-sm mb-1">"Add 10 shares of Apple at $271"</p>
-                    <p className="text-blue-400 text-sm">Or click "Import CSV" above</p>
+                    <p className="text-blue-400 text-sm mb-1">&quot;Add 10 shares of Apple at $271&quot;</p>
+                    <p className="text-blue-400 text-sm">Or click &quot;Import CSV&quot; above</p>
                   </div>
                 </div>
               )}
@@ -849,7 +871,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   <p className="text-slate-400 text-lg mb-3">No subscriptions tracked</p>
                   <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 max-w-md mx-auto">
                     <p className="text-purple-300 text-sm">
-                      "Add Netflix subscription $15 monthly"
+                      &quot;Add Netflix subscription $15 monthly&quot;
                     </p>
                   </div>
                 </div>
@@ -889,7 +911,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   <p className="text-slate-400 text-lg mb-3">No expenses tracked</p>
                   <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 max-w-md mx-auto">
                     <p className="text-orange-300 text-sm">
-                      "I spent $45 on lunch"
+                      &quot;I spent $45 on lunch&quot;
                     </p>
                   </div>
                 </div>
@@ -980,12 +1002,15 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   className="block bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4 rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:shadow-lg transition-all transform hover:scale-[1.02]"
                 >
                   {article.urlToImage && (
-                    <img 
-                      src={article.urlToImage} 
-                      alt={article.title}
-                      className="w-full h-40 object-cover rounded-lg mb-3"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
+                    <div className="relative w-full h-40 mb-3">
+                      <Image
+                        src={article.urlToImage}
+                        alt={article.title}
+                        fill
+                        className="object-cover rounded-lg"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    </div>
                   )}
                   <h3 className="text-purple-300 font-bold mb-2">{article.title}</h3>
                   <p className="text-slate-400 text-sm mb-2">{article.description}</p>
@@ -1035,23 +1060,23 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm max-w-3xl mx-auto">
               <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 p-5 rounded-xl border border-blue-500/20 text-left">
                 <div className="font-bold text-blue-400 mb-2 text-lg">📊 Stock Research</div>
-                <div className="text-slate-400">"What's AAPL price?"</div>
-                <div className="text-slate-400">"Should I buy Tesla?"</div>
+                <div className="text-slate-400">&quot;What&apos;s AAPL price?&quot;</div>
+                <div className="text-slate-400">&quot;Should I buy Tesla?&quot;</div>
               </div>
               <div className="bg-gradient-to-br from-emerald-500/10 to-green-600/10 p-5 rounded-xl border border-emerald-500/20 text-left">
                 <div className="font-bold text-emerald-400 mb-2 text-lg">💼 Portfolio Management</div>
-                <div className="text-slate-400">"Add 10 shares at $271"</div>
-                <div className="text-slate-400">"Analyze my portfolio"</div>
+                <div className="text-slate-400">&quot;Add 10 shares at $271&quot;</div>
+                <div className="text-slate-400">&quot;Analyze my portfolio&quot;</div>
               </div>
               <div className="bg-gradient-to-br from-orange-500/10 to-red-600/10 p-5 rounded-xl border border-orange-500/20 text-left">
                 <div className="font-bold text-orange-400 mb-2 text-lg">💸 Expense Tracking</div>
-                <div className="text-slate-400">"I spent $50 on groceries"</div>
-                <div className="text-slate-400">"Show my expenses"</div>
+                <div className="text-slate-400">&quot;I spent $50 on groceries&quot;</div>
+                <div className="text-slate-400">&quot;Show my expenses&quot;</div>
               </div>
               <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 p-5 rounded-xl border border-purple-500/20 text-left">
                 <div className="font-bold text-purple-400 mb-2 text-lg">🎯 IPO Research</div>
-                <div className="text-slate-400">"Tell me about Lenskart IPO"</div>
-                <div className="text-slate-400">"Upcoming IPOs this month"</div>
+                <div className="text-slate-400">&quot;Tell me about Lenskart IPO&quot;</div>
+                <div className="text-slate-400">&quot;Upcoming IPOs this month&quot;</div>
               </div>
             </div>
           </div>
@@ -1062,7 +1087,14 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
 }
 
 // Component definitions
-function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
+interface StockAnalysisCardProps {
+  symbol: string;
+  themeColor: string;
+  result: StockAnalysisResult;
+  status: string;
+}
+
+function StockAnalysisCard({ symbol, themeColor, result, status }: StockAnalysisCardProps) {
   if (status !== "complete" || !result || !result.currentPrice) {
     return (
       <div className="rounded-2xl shadow-2xl mt-4 mb-4 max-w-md w-full" style={{ background: `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}dd 100%)` }}>
@@ -1122,7 +1154,14 @@ function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
   );
 }
 
-function StockResearchCard({ query, themeColor, result, status }: any) {
+interface StockResearchCardProps {
+  query: string;
+  themeColor: string;
+  result: StockResearchResult;
+  status: string;
+}
+
+function StockResearchCard({ query, themeColor, result, status }: StockResearchCardProps) {
   if (status !== "complete" || !result || !result.analysis) {
     return (
       <div className="rounded-2xl shadow-2xl mt-4 mb-4 max-w-2xl w-full" style={{ background: `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}dd 100%)` }}>
@@ -1190,7 +1229,7 @@ function StockResearchCard({ query, themeColor, result, status }: any) {
           <div className="mt-5">
             <h4 className="text-white font-bold mb-3 text-lg">📰 Recent News</h4>
             <div className="space-y-2">
-              {result.news.slice(0, 3).map((article: any, idx: number) => (
+              {result.news.slice(0, 3).map((article: { title: string; source: string }, idx: number) => (
                 <div key={idx} className="bg-white/10 p-3 rounded-lg text-white/90 text-xs">
                   <p className="font-semibold mb-1">{article.title}</p>
                   <p className="text-white/70">{article.source}</p>
@@ -1204,7 +1243,13 @@ function StockResearchCard({ query, themeColor, result, status }: any) {
   );
 }
 
-function PortfolioUpdateCard({ action, themeColor, result, status }: any) {
+interface PortfolioUpdateCardProps {
+  themeColor: string;
+  result: { message?: string } | null;
+  status: string;
+}
+
+function PortfolioUpdateCard({ themeColor, result, status }: PortfolioUpdateCardProps) {
   if (status !== "complete" || !result) {
     return (
       <div className="rounded-2xl shadow-2xl mt-4 mb-4 max-w-md w-full" style={{ background: `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}dd 100%)` }}>
@@ -1224,7 +1269,20 @@ function PortfolioUpdateCard({ action, themeColor, result, status }: any) {
   );
 }
 
-function IPOResearchCard({ companyName, themeColor, result, status }: any) {
+interface IPOResearchCardProps {
+  companyName: string;
+  themeColor: string;
+  result: {
+    companyName: string;
+    ipoStatus: string;
+    findings: string;
+    sources?: string[];
+    recommendation?: string;
+  } | null;
+  status: string;
+}
+
+function IPOResearchCard({ companyName, themeColor, result, status }: IPOResearchCardProps) {
   if (status !== "complete" || !result) {
     return (
       <div className="rounded-2xl shadow-2xl mt-4 mb-4 max-w-2xl w-full" style={{ background: `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}dd 100%)` }}>

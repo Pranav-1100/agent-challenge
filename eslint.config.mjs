@@ -10,6 +10,9 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: ["src/mastra/**/*"],
+  },
   ...compat.config({
     extends: ["next/core-web-vitals", "next/typescript"],
     rules: {
