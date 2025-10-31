@@ -1,32 +1,47 @@
 import { MCPServer } from "@mastra/mcp";
 import { 
-  portfolioManagerTool,
+  // Core Tools (8) - Used by Agent
+  addStockTool,
+  removeStockTool,
   stockAnalyzerTool,
   smartStockResearchTool,
-  smartAlertsTool,
-  expenseTrackerTool,
+  portfolioAdvisorTool,
+  addAlertTool,
+  addExpenseTool,
+  addSubscriptionTool,
+  
+  // Optional Tools (4) - Available but not in agent
   csvImporterTool,
   rebalancingAnalyzerTool,
   benchmarkComparisonTool,
-  portfolioAdvisorTool,
   alertCheckerTool,
 } from "../tools";
 import { financeAgent } from "../agents";
 
 export const server = new MCPServer({
   name: "FinanceAI Server",
-  version: "2.0.0",
+  version: "3.0.0",
+  
+  // Expose ALL 12 tools via MCP
+  // This allows external systems to use any tool
   tools: { 
-    portfolioManagerTool,
+    // Core Tools
+    addStockTool,
+    removeStockTool,
     stockAnalyzerTool,
     smartStockResearchTool,
-    smartAlertsTool,
-    expenseTrackerTool,
+    portfolioAdvisorTool,
+    addAlertTool,
+    addExpenseTool,
+    addSubscriptionTool,
+    
+    // Optional Tools
     csvImporterTool,
     rebalancingAnalyzerTool,
     benchmarkComparisonTool,
-    portfolioAdvisorTool,
     alertCheckerTool,
   },
+  
+  // Agent only has 8 core tools
   agents: { financeAgent },
 });
