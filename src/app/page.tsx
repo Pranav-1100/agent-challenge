@@ -10,7 +10,7 @@ import { StockAnalysisResult, StockResearchResult } from "@/mastra/tools";
 type AgentState = z.infer<typeof FinanceAgentState>;
 
 export default function FinanceApp() {
-  const [themeColor, setThemeColor] = useState("#10b981");
+  const [themeColor, setThemeColor] = useState("#C9A15C");
 
   useCopilotAction({
     name: "setThemeColor",
@@ -31,20 +31,35 @@ export default function FinanceApp() {
         clickOutsideToClose={false}
         defaultOpen={true}
         labels={{
-          title: "FinanceAI Assistant",
-          initial: `💰 **Welcome to FinanceAI!**
+          title: "FinanceAI - Stock Research & Analysis",
+          initial: `**Welcome to FinanceAI**
+*Your AI-Powered Stock Research & Portfolio Analyst*
 
-**Quick Start:**
-• 📊 "What's AAPL price?"
-• 🔍 "Should I buy Tesla?" (deep research)
-• 📈 "Analyze my portfolio"
-• 💼 "Add 10 shares of Apple at $271"
-• 🔔 "Alert me if Apple drops below $160"
-• 💸 "I spent $45 on lunch"
-• 📝 "Add Netflix $15 monthly"
-• 🎯 "Tell me about Lenskart IPO"
+**Quick Commands:**
 
-I help with portfolio tracking, stock analysis, IPO research, expenses, and subscriptions!`
+**Stock Research & Analysis:**
+• "What's AAPL price?" - Real-time stock quotes
+• "Should I buy Tesla?" - Deep investment research
+• "Compare Apple vs Microsoft" - Side-by-side analysis
+• "Tell me about Lenskart IPO" - IPO research
+
+**Portfolio Management:**
+• "Add 10 shares of Apple at $271" - Add holdings
+• "Analyze my portfolio" - Full portfolio analysis
+• "What should I do in my portfolio?" - Get recommendations
+• "Which stocks should I sell?" - Performance review
+• "Import CSV" - Bulk import holdings
+
+**Price Alerts:**
+• "Alert me if Apple drops below $160"
+• "Alert me if Tesla goes above $500"
+
+**Financial Tracking:**
+• "I spent $45 on lunch" - Track expenses
+• "Add Netflix $15 monthly" - Track subscriptions
+• "Show my expenses" - View spending
+
+I'm your intelligent financial assistant for stock research, portfolio analysis, and wealth management.`
         }}
       />
     </main>
@@ -152,7 +167,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     reader.readAsText(file);
   };
 
-  // ✅ NEW: Analyze Portfolio Function
   const analyzePortfolio = async () => {
     if (!state.portfolio || state.portfolio.length === 0) {
       alert('❌ No stocks in portfolio to analyze');
@@ -163,7 +177,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     setShowAnalysisModal(true);
 
     try {
-      // Calculate current portfolio values
       const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
       
       const portfolioWithPrices = await Promise.all(
@@ -184,20 +197,16 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
         })
       );
 
-      // Calculate metrics
       const totalValue = portfolioWithPrices.reduce((sum, h) => sum + (h.currentPrice * h.quantity), 0);
       const totalCost = portfolioWithPrices.reduce((sum, h) => sum + (h.purchasePrice * h.quantity), 0);
       const numHoldings = portfolioWithPrices.length;
       
-      // Diversification score
       const diversificationScore = Math.min(numHoldings * 20, 100);
       
-      // Concentration risk
       const concentrationRisk = portfolioWithPrices.map(h => ((h.currentPrice * h.quantity) / totalValue) * 100);
       const maxConcentration = Math.max(...concentrationRisk);
       const riskScore = Math.min(maxConcentration * 2, 100);
       
-      // Generate recommendations
       const recs: string[] = [];
       if (numHoldings < 3) recs.push('Add more stocks for better diversification (aim for 5-10)');
       if (maxConcentration > 40) recs.push(`Reduce concentration in your top holding (${maxConcentration.toFixed(0)}% of portfolio)`);
@@ -205,7 +214,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       if (diversificationScore < 60) recs.push('Diversify across different sectors (tech, healthcare, finance)');
       if (riskScore > 70) recs.push('High concentration risk - consider spreading investments more evenly');
       
-      // Sector recommendations
       const techStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA'];
       const hasTech = portfolioWithPrices.some(h => techStocks.includes(h.symbol));
       if (!hasTech) recs.push('Consider adding tech stocks for growth potential');
@@ -233,7 +241,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
   };
 
-  // ✅ NEW: Generate stock recommendations based on portfolio
   const generateStockRecommendations = async () => {
     if (!state.portfolio || state.portfolio.length === 0) return;
 
@@ -241,10 +248,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       const apiKey = process.env.NEXT_PUBLIC_FINNHUB_API_KEY || '';
       if (!apiKey) return;
 
-      // Get portfolio symbols
       const portfolioSymbols = state.portfolio.map(h => h.symbol);
       
-      // Common popular stocks for recommendations
       const allStocks = [
         { symbol: 'AAPL', name: 'Apple', sector: 'Technology' },
         { symbol: 'MSFT', name: 'Microsoft', sector: 'Technology' },
@@ -260,10 +265,8 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
         { symbol: 'PG', name: 'Procter & Gamble', sector: 'Consumer' },
       ];
 
-      // Filter out stocks already in portfolio
       const suggestedStocks = allStocks.filter(s => !portfolioSymbols.includes(s.symbol));
 
-      // Fetch current prices for top 5 suggestions
       const recommendations = await Promise.all(
         suggestedStocks.slice(0, 5).map(async (stock) => {
           try {
@@ -279,7 +282,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             else if (changePercent < -5) action = 'SELL';
             else if (changePercent < -2) action = 'CAUTION';
             
-            // Determine reason based on portfolio
             let reason = '';
             if (!portfolioSymbols.some(s => allStocks.find(st => st.symbol === s)?.sector === stock.sector)) {
               reason = `Diversify into ${stock.sector} sector`;
@@ -310,7 +312,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
   };
 
-  // ✅ NEW: Fetch related news based on portfolio
   const fetchRelatedNews = async () => {
     if (!state.portfolio || state.portfolio.length === 0) return;
 
@@ -318,7 +319,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
       const apiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY || process.env.NEWS_API_KEY;
       if (!apiKey) return;
 
-      // Get portfolio company names
       const symbols = state.portfolio.map(h => h.symbol).join(' OR ');
       
       const response = await fetch(
@@ -334,7 +334,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
   };
 
-  // ✅ NEW: Fetch latest news
   const fetchLatestNews = async () => {
     try {
       const apiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY || process.env.NEWS_API_KEY;
@@ -428,11 +427,11 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
   useEffect(() => {
     console.log('📊 Portfolio state changed:', state.portfolio);
     updatePortfolioPrices();
-    // ✅ NEW: Generate recommendations when portfolio changes
     if (state.portfolio && state.portfolio.length > 0) {
       generateStockRecommendations();
       fetchRelatedNews();
     }
+    fetchLatestNews();
   }, [state.portfolio, updatePortfolioPrices]);
 
   useEffect(() => {
@@ -465,7 +464,6 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     }
   }, [state.expenses]);
 
-  // ✅ FIXED: Update when subscriptions change
   useEffect(() => {
     console.log('📝 Subscriptions updated:', state.billReminders?.length);
     if (state.billReminders && state.billReminders.length > 0) {
@@ -521,7 +519,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
     <div 
       className="min-h-screen w-screen flex justify-center items-start py-8 transition-all duration-500"
       style={{
-        background: `linear-gradient(135deg, ${themeColor}15 0%, ${themeColor}05 100%)`,
+        background: `linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #422006 100%)`,
       }}
     >
       <div className="max-w-7xl w-full px-4">
@@ -532,12 +530,13 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             background: `linear-gradient(135deg, ${themeColor} 0%, ${themeColor}dd 100%)`,
           }}
         >
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-sm"></div>
+          <div className="absolute inset-0 bg-black/20"></div>
+          <div className="absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.05) 10px, rgba(255,255,255,.05) 20px)' }}></div>
           <div className="relative z-10">
             <div className="flex justify-between items-center mb-3">
               <div className="flex-1"></div>
               <h1 className="text-5xl font-bold text-white text-center flex-1 drop-shadow-lg">
-                💰 FinanceAI Dashboard
+                FinanceAI Dashboard
               </h1>
               <div className="flex-1 flex justify-end gap-3">
                 <button
@@ -556,38 +555,38 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               </div>
             </div>
             <p className="text-white/90 text-center text-lg drop-shadow">
-              Your AI-powered financial command center • Last updated: {lastUpdate.toLocaleTimeString()}
+              AI-Powered Stock Research & Portfolio Analysis • Last updated: {lastUpdate.toLocaleTimeString()}
             </p>
           </div>
         </div>
 
         {showUploadModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn" onClick={() => !uploadStatus && setShowUploadModal(false)}>
-            <div className="bg-white rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl transform transition-all" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-3xl font-bold mb-6 text-gray-800 flex items-center gap-3">
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border-2 border-amber-500/30 transform transition-all" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-3xl font-bold mb-6 text-amber-400 flex items-center gap-3">
                 📊 Import Portfolio CSV
               </h2>
               
               {uploadStatus ? (
                 <div className="text-center py-8">
-                  <p className="text-2xl mb-4">{uploadStatus}</p>
+                  <p className="text-2xl mb-4 text-amber-200">{uploadStatus}</p>
                   {uploadStatus.includes('Reading') || uploadStatus.includes('Parsing') || uploadStatus.includes('Importing') && (
-                    <div className="animate-pulse">⏳</div>
+                    <div className="animate-pulse text-4xl">⏳</div>
                   )}
                 </div>
               ) : (
                 <>
                   <div className="mb-6">
-                    <p className="text-gray-700 mb-3 font-semibold">Required CSV format:</p>
-                    <div className="bg-gray-100 p-4 rounded-xl font-mono text-sm mb-4 border-2 border-gray-200">
-                      <div className="text-green-600">Symbol,Quantity,Price</div>
-                      <div>AAPL,10,271.00</div>
-                      <div>MSFT,5,526.00</div>
-                      <div>GOOGL,3,178.50</div>
-                      <div>TSLA,2,245.00</div>
+                    <p className="text-amber-200 mb-3 font-semibold">Required CSV format:</p>
+                    <div className="bg-slate-900/70 p-4 rounded-xl font-mono text-sm mb-4 border-2 border-amber-500/20">
+                      <div className="text-amber-400 font-bold">Symbol,Quantity,Price</div>
+                      <div className="text-slate-300">AAPL,10,271.00</div>
+                      <div className="text-slate-300">MSFT,5,526.00</div>
+                      <div className="text-slate-300">GOOGL,3,178.50</div>
+                      <div className="text-slate-300">TSLA,2,245.00</div>
                     </div>
-                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
-                      <p className="text-sm text-blue-900">
+                    <div className="bg-amber-500/10 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                      <p className="text-sm text-amber-200">
                         <strong>Tips:</strong><br/>
                         • First line must be header<br/>
                         • No spaces around commas<br/>
@@ -612,7 +611,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                   </button>
                   <button
                     onClick={() => setShowUploadModal(false)}
-                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-xl font-semibold transition-all"
+                    className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl font-semibold transition-all"
                   >
                     Cancel
                   </button>
@@ -622,75 +621,85 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
           </div>
         )}
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white/90 text-sm font-bold uppercase tracking-wide">Portfolio Value</h3>
-              <span className="text-3xl">📊</span>
-            </div>
-            <div className="text-4xl font-bold text-white mb-2">
-              ${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className={`text-sm font-bold ${portfolioGain >= 0 ? 'text-green-100' : 'text-red-100'}`}>
-              {portfolioGain >= 0 ? '↑' : '↓'} ${Math.abs(portfolioGain).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              {portfolioCostBasis > 0 && ` (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`}
-            </div>
-            {portfolioCostBasis > 0 && (
-              <div className="text-white/70 text-xs mt-2">
-                Cost basis: ${portfolioCostBasis.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="bg-gradient-to-br from-emerald-600 to-green-700 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105 relative overflow-hidden border border-emerald-400/30">
+            <div className="absolute top-0 right-0 text-9xl opacity-5 font-bold">$</div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-emerald-100 text-sm font-bold uppercase tracking-wide">Portfolio Value</h3>
+                <span className="text-3xl">📊</span>
               </div>
-            )}
+              <div className="text-4xl font-bold text-white mb-2">
+                ${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className={`text-sm font-bold ${portfolioGain >= 0 ? 'text-emerald-100' : 'text-red-100'}`}>
+                {portfolioGain >= 0 ? '↑' : '↓'} ${Math.abs(portfolioGain).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {portfolioCostBasis > 0 && ` (${gainPercent >= 0 ? '+' : ''}${gainPercent.toFixed(2)}%)`}
+              </div>
+              {portfolioCostBasis > 0 && (
+                <div className="text-emerald-100/70 text-xs mt-2">
+                  Cost basis: ${portfolioCostBasis.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="bg-gradient-to-br from-orange-500 to-red-600 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white/90 text-sm font-bold uppercase tracking-wide">Monthly Expenses</h3>
-              <span className="text-3xl">💸</span>
-            </div>
-            <div className="text-4xl font-bold text-white mb-2">
-              ${monthlyExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-white/80 text-sm">
-              {state.expenses?.length || 0} transactions this month
+          <div className="bg-gradient-to-br from-orange-600 to-red-700 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105 relative overflow-hidden border border-orange-400/30">
+            <div className="absolute top-0 right-0 text-9xl opacity-5 font-bold">$</div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-orange-100 text-sm font-bold uppercase tracking-wide">Monthly Expenses</h3>
+                <span className="text-3xl">💸</span>
+              </div>
+              <div className="text-4xl font-bold text-white mb-2">
+                ${monthlyExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-orange-100/80 text-sm">
+                {state.expenses?.length || 0} transactions this month
+              </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white/90 text-sm font-bold uppercase tracking-wide">Subscriptions</h3>
-              <span className="text-3xl">📝</span>
-            </div>
-            <div className="text-4xl font-bold text-white mb-2">
-              ${monthlySubscriptions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className="text-white/80 text-sm">
-              {state.billReminders?.length || 0} active subscription{state.billReminders?.length !== 1 ? 's' : ''}
+          <div className="bg-gradient-to-br from-blue-600 to-purple-700 p-6 rounded-2xl shadow-xl transform transition-all hover:scale-105 relative overflow-hidden border border-blue-400/30">
+            <div className="absolute top-0 right-0 text-9xl opacity-5 font-bold">$</div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-blue-100 text-sm font-bold uppercase tracking-wide">Subscriptions</h3>
+                <span className="text-3xl">📝</span>
+              </div>
+              <div className="text-4xl font-bold text-white mb-2">
+                ${monthlySubscriptions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="text-blue-100/80 text-sm">
+                {state.billReminders?.length || 0} active subscription{state.billReminders?.length !== 1 ? 's' : ''}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ✅ NEW: Quick Actions Section */}
+        {/* Quick Actions */}
         {livePortfolio.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-gray-200 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">⚡ Quick Actions</h2>
+          <div className="bg-slate-800/70 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-amber-500/20 mb-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">⚡ Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <button
                 onClick={analyzePortfolio}
                 disabled={isAnalyzing}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 disabled:opacity-50"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 disabled:opacity-50"
               >
                 {isAnalyzing ? '⏳ Analyzing...' : '📊 Analyze Portfolio'}
               </button>
               <button
                 onClick={() => updatePortfolioPrices()}
                 disabled={isLoadingPrices}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 disabled:opacity-50"
+                className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 disabled:opacity-50"
               >
                 {isLoadingPrices ? '⏳ Refreshing...' : '🔄 Refresh Prices'}
               </button>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105"
+                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105"
               >
                 📂 Import CSV
               </button>
@@ -698,127 +707,21 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
           </div>
         )}
 
-        {/* ✅ NEW: Recommendations Section */}
-        {recommendations.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-gray-200 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">💡 Smart Recommendations</h2>
-            <div className="space-y-3">
-              {recommendations.map((rec, index) => (
-                <div key={index} className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-xl border border-blue-200">
-                  <p className="text-gray-800 font-semibold">✓ {rec}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ✅ NEW: Stock Recommendations Section */}
-        {stockRecommendations.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-gray-200 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">🎯 Recommended Stocks for You</h2>
-            <p className="text-gray-600 mb-4 text-sm">Based on your portfolio diversification and market trends</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {stockRecommendations.map((stock, index) => (
-                <div key={index} className="bg-gradient-to-br from-green-50 to-blue-50 p-5 rounded-xl border border-green-200 hover:shadow-lg transition-all transform hover:scale-105">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{stock.symbol}</h3>
-                      <p className="text-gray-600 text-sm">{stock.name}</p>
-                      <p className="text-gray-500 text-xs">{stock.sector}</p>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      stock.action === 'STRONG BUY' || stock.action === 'BUY' ? 'bg-green-500 text-white' :
-                      stock.action === 'HOLD' ? 'bg-blue-500 text-white' :
-                      'bg-orange-500 text-white'
-                    }`}>
-                      {stock.action}
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <div className="text-2xl font-bold text-gray-900">${stock.currentPrice.toFixed(2)}</div>
-                    <div className={`text-sm font-semibold ${stock.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {stock.changePercent >= 0 ? '↑' : '↓'} {Math.abs(stock.changePercent).toFixed(2)}%
-                    </div>
-                  </div>
-                  <div className="bg-white/50 p-3 rounded-lg">
-                    <p className="text-gray-700 text-sm font-medium">💡 {stock.reason}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ✅ NEW: Related News Section */}
-        {relatedNews.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-gray-200 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">📰 News About Your Holdings</h2>
-            <div className="space-y-4">
-              {relatedNews.map((article, index) => (
-                <a
-                  key={index}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-200 hover:shadow-lg transition-all transform hover:scale-[1.02]"
-                >
-                  {article.urlToImage && (
-                    <img 
-                      src={article.urlToImage} 
-                      alt={article.title}
-                      className="w-full h-40 object-cover rounded-lg mb-3"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  )}
-                  <h3 className="text-gray-900 font-bold mb-2">{article.title}</h3>
-                  <p className="text-gray-600 text-sm mb-2">{article.description}</p>
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span className="font-semibold">{article.source.name}</span>
-                    <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ✅ Latest Financial News Section */}
-        {latestNews.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-gray-200 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">📰 Latest Financial News</h2>
-            <div className="space-y-4">
-              {latestNews.map((article, index) => (
-                <a
-                  key={index}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-gradient-to-r from-gray-50 to-white p-4 rounded-xl border border-gray-200 hover:shadow-lg transition-all transform hover:scale-[1.02]"
-                >
-                  <h3 className="text-gray-900 font-bold mb-2">{article.title}</h3>
-                  <p className="text-gray-600 text-sm mb-2">{article.description}</p>
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>{article.source.name}</span>
-                    <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
+          {/* Left Column */}
           <div className="space-y-8">
             
-            <div className="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-gray-200">
+            {/* Portfolio Section */}
+            <div className="bg-slate-800/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-amber-500/20">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+                <h2 className="text-3xl font-bold text-amber-400 flex items-center gap-2">
                   📈 Portfolio
-                  {isLoadingPrices && <span className="text-sm text-gray-500 animate-pulse">(updating...)</span>}
+                  {isLoadingPrices && <span className="text-sm text-amber-300 animate-pulse">(updating...)</span>}
                 </h2>
                 {livePortfolio.length > 0 && (
-                  <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  <span className="text-xs text-amber-300 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
                     Live • Auto-refresh: 30s
                   </span>
                 )}
@@ -831,27 +734,27 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                     return (
                       <div 
                         key={index} 
-                        className="bg-gradient-to-r from-gray-50 to-white p-5 rounded-xl hover:shadow-lg transition-all border border-gray-200 transform hover:scale-[1.02]"
+                        className="bg-slate-900/50 p-5 rounded-xl hover:shadow-lg transition-all border border-amber-500/10 hover:border-amber-500/30 transform hover:scale-[1.02]"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <div className="text-gray-900 font-bold text-xl">{holding.symbol}</div>
-                            <div className="text-gray-600 text-sm">{holding.quantity} shares</div>
+                            <div className="text-amber-300 font-bold text-xl">{holding.symbol}</div>
+                            <div className="text-slate-400 text-sm">{holding.quantity} shares</div>
                           </div>
                           <div className="text-right">
-                            <div className="text-gray-900 font-bold text-lg">
+                            <div className="text-white font-bold text-lg">
                               ${holding.currentPrice.toFixed(2)}
                             </div>
-                            <div className="text-gray-500 text-xs">
+                            <div className="text-slate-400 text-xs">
                               Bought: ${holding.purchasePrice.toFixed(2)}
                             </div>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                          <div className="text-gray-700 font-semibold">
+                        <div className="flex justify-between items-center pt-3 border-t border-slate-700">
+                          <div className="text-slate-300 font-semibold">
                             Value: ${holding.totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
-                          <div className={`text-sm font-bold px-3 py-1 rounded-full ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          <div className={`text-sm font-bold px-3 py-1 rounded-full ${isPositive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
                             {isPositive ? '↑' : '↓'} ${Math.abs(holding.gainLoss).toFixed(2)} ({holding.gainLossPercent.toFixed(2)}%)
                           </div>
                         </div>
@@ -859,16 +762,16 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
                     );
                   })}
                   
-                  <div className="bg-gradient-to-r from-gray-100 to-gray-50 p-5 rounded-xl border-2 border-gray-300 mt-4">
+                  <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 rounded-xl border-2 border-amber-500/40 mt-4">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-700 font-bold text-lg">Total Portfolio:</span>
-                      <span className="text-gray-900 font-bold text-2xl">
+                      <span className="text-amber-300 font-bold text-lg">Total Portfolio:</span>
+                      <span className="text-white font-bold text-2xl">
                         ${portfolioValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 text-sm">Total Gain/Loss:</span>
-                      <span className={`font-bold text-lg ${portfolioGain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className="text-slate-400 text-sm">Total Gain/Loss:</span>
+                      <span className={`font-bold text-lg ${portfolioGain >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                         {portfolioGain >= 0 ? '+' : ''} ${portfolioGain.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({gainPercent.toFixed(2)}%)
                       </span>
                     </div>
@@ -877,28 +780,29 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📊</div>
-                  <p className="text-gray-600 text-lg mb-3">No holdings yet</p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-md mx-auto">
-                    <p className="text-blue-900 text-sm mb-2 font-semibold">Get started:</p>
-                    <p className="text-blue-800 text-sm mb-1">💬 "Add 10 shares of Apple at $271"</p>
-                    <p className="text-blue-800 text-sm">📊 Or click "Import CSV" above</p>
+                  <p className="text-slate-400 text-lg mb-3">No holdings yet</p>
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 max-w-md mx-auto">
+                    <p className="text-blue-300 text-sm mb-2 font-semibold">Get started:</p>
+                    <p className="text-blue-400 text-sm mb-1">"Add 10 shares of Apple at $271"</p>
+                    <p className="text-blue-400 text-sm">Or click "Import CSV" above</p>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Alerts */}
             {state.alerts && state.alerts.length > 0 && (
-              <div className="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-gray-200">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              <div className="bg-slate-800/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-amber-500/20">
+                <h2 className="text-3xl font-bold text-amber-400 mb-6 flex items-center gap-2">
                   🔔 Price Alerts
                 </h2>
                 <div className="space-y-3">
                   {state.alerts.map((alert, index) => (
-                    <div key={index} className="bg-yellow-50 border-2 border-yellow-300 p-4 rounded-xl">
-                      <div className="text-gray-900 font-bold text-lg">
+                    <div key={index} className="bg-amber-500/10 border-2 border-amber-500/30 p-4 rounded-xl">
+                      <div className="text-amber-300 font-bold text-lg">
                         {alert.symbol} {alert.condition} ${alert.targetPrice.toFixed(2)}
                       </div>
-                      <div className="text-gray-600 text-sm mt-1">
+                      <div className="text-slate-400 text-sm mt-1">
                         Will notify when price condition is met
                       </div>
                     </div>
@@ -908,30 +812,32 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
             )}
           </div>
 
+          {/* Right Column */}
           <div className="space-y-8">
             
-            <div className="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-gray-200">
-              <h2 className="text-3xl font-bold text-gray-800 mb-6">📝 Subscriptions</h2>
+            {/* Subscriptions */}
+            <div className="bg-slate-800/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-amber-500/20">
+              <h2 className="text-3xl font-bold text-amber-400 mb-6">📝 Subscriptions</h2>
               
               {state.billReminders && state.billReminders.length > 0 ? (
                 <div className="space-y-4">
                   {state.billReminders.map((bill, index) => (
-                    <div key={index} className="bg-gradient-to-r from-purple-50 to-blue-50 p-5 rounded-xl border border-purple-200">
+                    <div key={index} className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-5 rounded-xl border border-purple-500/20">
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="text-gray-900 font-bold text-lg">{bill.name}</div>
-                          <div className="text-gray-600 text-sm">Due: Day {bill.dueDay} of month</div>
+                          <div className="text-purple-300 font-bold text-lg">{bill.name}</div>
+                          <div className="text-slate-400 text-sm">Due: Day {bill.dueDay} of month</div>
                         </div>
-                        <div className="text-gray-900 font-bold text-xl">
+                        <div className="text-white font-bold text-xl">
                           ${bill.amount.toFixed(2)}
                         </div>
                       </div>
                     </div>
                   ))}
-                  <div className="pt-4 border-t-2 border-gray-300">
-                    <div className="flex justify-between items-center bg-gradient-to-r from-purple-100 to-blue-100 p-4 rounded-xl">
-                      <span className="text-gray-800 font-bold text-lg">Monthly Total:</span>
-                      <span className="text-gray-900 font-bold text-2xl">
+                  <div className="pt-4 border-t-2 border-slate-700">
+                    <div className="flex justify-between items-center bg-gradient-to-r from-purple-500/10 to-blue-500/10 p-4 rounded-xl border border-purple-500/20">
+                      <span className="text-slate-300 font-bold text-lg">Monthly Total:</span>
+                      <span className="text-white font-bold text-2xl">
                         ${monthlySubscriptions.toFixed(2)}
                       </span>
                     </div>
@@ -940,37 +846,38 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📝</div>
-                  <p className="text-gray-600 text-lg mb-3">No subscriptions tracked</p>
-                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 max-w-md mx-auto">
-                    <p className="text-purple-900 text-sm">
-                      💬 "Add Netflix subscription $15 monthly"
+                  <p className="text-slate-400 text-lg mb-3">No subscriptions tracked</p>
+                  <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 max-w-md mx-auto">
+                    <p className="text-purple-300 text-sm">
+                      "Add Netflix subscription $15 monthly"
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-gray-200">
-              <h2 className="text-3xl font-bold text-gray-800 mb-6">💸 Recent Expenses</h2>
+            {/* Expenses */}
+            <div className="bg-slate-800/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-amber-500/20">
+              <h2 className="text-3xl font-bold text-amber-400 mb-6">💸 Recent Expenses</h2>
               
               {state.expenses && state.expenses.length > 0 ? (
                 <div className="space-y-3">
                   {state.expenses.slice(-5).reverse().map((expense, index) => (
-                    <div key={index} className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-xl flex justify-between items-center border border-orange-200">
+                    <div key={index} className="bg-gradient-to-r from-orange-500/10 to-red-500/10 p-4 rounded-xl flex justify-between items-center border border-orange-500/20">
                       <div>
-                        <div className="text-gray-900 font-bold capitalize">{expense.category}</div>
-                        <div className="text-gray-600 text-sm">{expense.description}</div>
-                        <div className="text-gray-500 text-xs">{new Date(expense.date).toLocaleDateString()}</div>
+                        <div className="text-orange-300 font-bold capitalize">{expense.category}</div>
+                        <div className="text-slate-400 text-sm">{expense.description}</div>
+                        <div className="text-slate-500 text-xs">{new Date(expense.date).toLocaleDateString()}</div>
                       </div>
-                      <div className="text-gray-900 font-bold text-lg">
+                      <div className="text-white font-bold text-lg">
                         ${expense.amount.toFixed(2)}
                       </div>
                     </div>
                   ))}
-                  <div className="pt-4 border-t-2 border-gray-300">
-                    <div className="flex justify-between items-center bg-gradient-to-r from-orange-100 to-red-100 p-4 rounded-xl">
-                      <span className="text-gray-800 font-bold text-lg">This Month:</span>
-                      <span className="text-gray-900 font-bold text-2xl">
+                  <div className="pt-4 border-t-2 border-slate-700">
+                    <div className="flex justify-between items-center bg-gradient-to-r from-orange-500/10 to-red-500/10 p-4 rounded-xl border border-orange-500/20">
+                      <span className="text-slate-300 font-bold text-lg">This Month:</span>
+                      <span className="text-white font-bold text-2xl">
                         ${monthlyExpenses.toFixed(2)}
                       </span>
                     </div>
@@ -979,24 +886,25 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
               ) : (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">💸</div>
-                  <p className="text-gray-600 text-lg mb-3">No expenses tracked</p>
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 max-w-md mx-auto">
-                    <p className="text-orange-900 text-sm">
-                      💬 "I spent $45 on lunch"
+                  <p className="text-slate-400 text-lg mb-3">No expenses tracked</p>
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 max-w-md mx-auto">
+                    <p className="text-orange-300 text-sm">
+                      "I spent $45 on lunch"
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Watchlist */}
             {state.watchlist && state.watchlist.length > 0 && (
-              <div className="bg-white/90 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-gray-200">
-                <h2 className="text-3xl font-bold text-gray-800 mb-6">⭐ Watchlist</h2>
+              <div className="bg-slate-800/70 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-amber-500/20">
+                <h2 className="text-3xl font-bold text-amber-400 mb-6">⭐ Watchlist</h2>
                 <div className="flex flex-wrap gap-3">
                   {state.watchlist.map((symbol, index) => (
                     <div 
                       key={index} 
-                      className="bg-gradient-to-r from-yellow-100 to-amber-100 px-5 py-3 rounded-full text-gray-900 font-bold hover:shadow-lg transition-all cursor-pointer border border-yellow-300 transform hover:scale-105"
+                      className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 px-5 py-3 rounded-full text-amber-300 font-bold hover:shadow-lg transition-all cursor-pointer border border-amber-500/30 transform hover:scale-105"
                     >
                       {symbol}
                     </div>
@@ -1007,33 +915,143 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
           </div>
         </div>
 
+        {/* MOVED TO BOTTOM: Recommendations */}
+        {recommendations.length > 0 && (
+          <div className="bg-slate-800/70 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-amber-500/20 mt-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">💡 Portfolio Recommendations</h2>
+            <div className="space-y-3">
+              {recommendations.map((rec, index) => (
+                <div key={index} className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-4 rounded-xl border border-blue-500/20">
+                  <p className="text-blue-300 font-semibold">✓ {rec}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MOVED TO BOTTOM: Stock Recommendations */}
+        {stockRecommendations.length > 0 && (
+          <div className="bg-slate-800/70 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-amber-500/20 mt-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">🎯 Recommended Investments</h2>
+            <p className="text-slate-400 mb-4 text-sm">Based on your portfolio diversification and market trends</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {stockRecommendations.map((stock, index) => (
+                <div key={index} className="bg-slate-900/50 p-5 rounded-xl border border-green-500/20 hover:border-green-500/40 hover:shadow-lg transition-all transform hover:scale-105">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-xl font-bold text-emerald-400">{stock.symbol}</h3>
+                      <p className="text-slate-400 text-sm">{stock.name}</p>
+                      <p className="text-slate-500 text-xs">{stock.sector}</p>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      stock.action === 'STRONG BUY' || stock.action === 'BUY' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                      stock.action === 'HOLD' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                      'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                    }`}>
+                      {stock.action}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <div className="text-2xl font-bold text-white">${stock.currentPrice.toFixed(2)}</div>
+                    <div className={`text-sm font-semibold ${stock.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {stock.changePercent >= 0 ? '↑' : '↓'} {Math.abs(stock.changePercent).toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="bg-slate-800/50 p-3 rounded-lg">
+                    <p className="text-slate-300 text-sm font-medium">💡 {stock.reason}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MOVED TO BOTTOM: Related News */}
+        {relatedNews.length > 0 && (
+          <div className="bg-slate-800/70 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-amber-500/20 mt-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">📰 News About Your Holdings</h2>
+            <div className="space-y-4">
+              {relatedNews.map((article, index) => (
+                <a
+                  key={index}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4 rounded-xl border border-purple-500/20 hover:border-purple-500/40 hover:shadow-lg transition-all transform hover:scale-[1.02]"
+                >
+                  {article.urlToImage && (
+                    <img 
+                      src={article.urlToImage} 
+                      alt={article.title}
+                      className="w-full h-40 object-cover rounded-lg mb-3"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  )}
+                  <h3 className="text-purple-300 font-bold mb-2">{article.title}</h3>
+                  <p className="text-slate-400 text-sm mb-2">{article.description}</p>
+                  <div className="flex justify-between items-center text-xs text-slate-500">
+                    <span className="font-semibold">{article.source.name}</span>
+                    <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* MOVED TO BOTTOM: Latest News */}
+        {latestNews.length > 0 && (
+          <div className="bg-slate-800/70 backdrop-blur-xl p-6 rounded-2xl shadow-xl border border-amber-500/20 mt-8">
+            <h2 className="text-2xl font-bold text-amber-400 mb-4">📰 Latest Financial News</h2>
+            <div className="space-y-4">
+              {latestNews.map((article, index) => (
+                <a
+                  key={index}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-gradient-to-r from-slate-900/70 to-slate-800/70 p-4 rounded-xl border border-slate-700 hover:border-slate-600 hover:shadow-lg transition-all transform hover:scale-[1.02]"
+                >
+                  <h3 className="text-slate-200 font-bold mb-2">{article.title}</h3>
+                  <p className="text-slate-400 text-sm mb-2">{article.description}</p>
+                  <div className="flex justify-between items-center text-xs text-slate-500">
+                    <span>{article.source.name}</span>
+                    <span>{new Date(article.publishedAt).toLocaleDateString()}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Welcome Screen */}
         {(!state.portfolio || state.portfolio.length === 0) &&
          (!state.expenses || state.expenses.length === 0) &&
          (!state.billReminders || state.billReminders.length === 0) && (
-          <div className="bg-white/90 backdrop-blur-xl p-12 rounded-3xl shadow-2xl text-center mt-8 border border-gray-200">
+          <div className="bg-slate-800/70 backdrop-blur-xl p-12 rounded-3xl shadow-2xl text-center mt-8 border border-amber-500/20">
             <div className="text-7xl mb-6">👋</div>
-            <h2 className="text-4xl font-bold text-gray-800 mb-4">Welcome to FinanceAI!</h2>
-            <p className="text-gray-600 text-lg mb-8">Start managing your finances intelligently with AI</p>
+            <h2 className="text-4xl font-bold text-amber-400 mb-4">Welcome to FinanceAI!</h2>
+            <p className="text-slate-300 text-lg mb-8">AI-Powered Stock Research & Portfolio Analysis</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm max-w-3xl mx-auto">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-5 rounded-xl border border-blue-200 text-left">
-                <div className="font-bold text-gray-900 mb-2 text-lg">📊 Stock Analysis</div>
-                <div className="text-gray-700">"Analyze Tesla stock"</div>
-                <div className="text-gray-700">"What's AAPL price?"</div>
+              <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 p-5 rounded-xl border border-blue-500/20 text-left">
+                <div className="font-bold text-blue-400 mb-2 text-lg">📊 Stock Research</div>
+                <div className="text-slate-400">"What's AAPL price?"</div>
+                <div className="text-slate-400">"Should I buy Tesla?"</div>
               </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 p-5 rounded-xl border border-green-200 text-left">
-                <div className="font-bold text-gray-900 mb-2 text-lg">💼 Portfolio Management</div>
-                <div className="text-gray-700">"Add 10 Apple shares at $271"</div>
-                <div className="text-gray-700">"Show my portfolio"</div>
+              <div className="bg-gradient-to-br from-emerald-500/10 to-green-600/10 p-5 rounded-xl border border-emerald-500/20 text-left">
+                <div className="font-bold text-emerald-400 mb-2 text-lg">💼 Portfolio Management</div>
+                <div className="text-slate-400">"Add 10 shares at $271"</div>
+                <div className="text-slate-400">"Analyze my portfolio"</div>
               </div>
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 text-left">
-                <div className="font-bold text-gray-900 mb-2 text-lg">💸 Expense Tracking</div>
-                <div className="text-gray-700">"I spent $50 on groceries"</div>
-                <div className="text-gray-700">"Show my expenses"</div>
+              <div className="bg-gradient-to-br from-orange-500/10 to-red-600/10 p-5 rounded-xl border border-orange-500/20 text-left">
+                <div className="font-bold text-orange-400 mb-2 text-lg">💸 Expense Tracking</div>
+                <div className="text-slate-400">"I spent $50 on groceries"</div>
+                <div className="text-slate-400">"Show my expenses"</div>
               </div>
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-5 rounded-xl border border-purple-200 text-left">
-                <div className="font-bold text-gray-900 mb-2 text-lg">🎯 IPO Research</div>
-                <div className="text-gray-700">"Tell me about Lenskart IPO"</div>
-                <div className="text-gray-700">"Should I invest in X IPO?"</div>
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 p-5 rounded-xl border border-purple-500/20 text-left">
+                <div className="font-bold text-purple-400 mb-2 text-lg">🎯 IPO Research</div>
+                <div className="text-slate-400">"Tell me about Lenskart IPO"</div>
+                <div className="text-slate-400">"Upcoming IPOs this month"</div>
               </div>
             </div>
           </div>
@@ -1043,6 +1061,7 @@ function MainDashboard({ themeColor }: { themeColor: string }) {
   );
 }
 
+// Component definitions
 function StockAnalysisCard({ symbol, themeColor, result, status }: any) {
   if (status !== "complete" || !result || !result.currentPrice) {
     return (

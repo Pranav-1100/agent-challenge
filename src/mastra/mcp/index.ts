@@ -12,12 +12,13 @@ import {
   alertCheckerTool,
   ipoResearchTool,
   portfolioProfitCalculatorTool,
+  emailNotificationTool,
 } from "../tools";
 import { financeAgent } from "../agents";
 
 export const server = new MCPServer({
   name: "FinanceAI Server",
-  version: "2.1.0",
+  version: "2.2.0",
   tools: { 
     portfolioManagerTool,
     stockAnalyzerTool,
@@ -30,7 +31,8 @@ export const server = new MCPServer({
     portfolioAdvisorTool,
     alertCheckerTool,
     ipoResearchTool,
-    portfolioProfitCalculatorTool, 
+    portfolioProfitCalculatorTool,
+    emailNotificationTool,
   },
   agents: { financeAgent },
 });

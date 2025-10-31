@@ -3,7 +3,61 @@ import { z } from 'zod';
 import nodemailer from 'nodemailer';
 
 // ============================================================================
-// IPO RESEARCH - NOW WITH FINNHUB IPO CALENDAR API! 🎯
+// EMAIL NOTIFICATION TOOL - NEW! 📧
+// ============================================================================
+
+export const emailNotificationTool = createTool({
+  id: 'email-notification',
+  description: 'Send email notifications to users for alerts and subscriptions',
+  inputSchema: z.object({
+    to: z.string().describe('Recipient email address'),
+    subject: z.string().describe('Email subject'),
+    body: z.string().describe('Email body content'),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  execute: async ({ context }) => {
+    try {
+      console.log(`📧 Sending email to ${context.to}...`);
+      
+      // Configure nodemailer transporter for Gmail
+      const transporter = nodemailer.createTransporter({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: context.to,
+        subject: context.subject,
+        text: context.body,
+      };
+
+      await transporter.sendMail(mailOptions);
+
+      console.log(`✅ Email sent successfully to ${context.to}`);
+      
+      return {
+        success: true,
+        message: `Email sent to ${context.to}`,
+      };
+    } catch (error) {
+      console.error('❌ Email sending error:', error);
+      return {
+        success: false,
+        message: `Failed to send email. Error: ${error}. Please check EMAIL_USER and EMAIL_PASS in .env`,
+      };
+    }
+  },
+});
+
+// ============================================================================
+// IPO RESEARCH - WITH FINNHUB IPO CALENDAR API! 🎯
 // ============================================================================
 
 export const ipoResearchTool = createTool({
@@ -45,16 +99,15 @@ export const ipoResearchTool = createTool({
         };
       }
 
-      // Calculate date range based on timeframe
       const today = new Date();
       let fromDate: Date;
       let toDate: Date;
 
       if (context.timeframe === 'upcoming') {
         fromDate = today;
-        toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000); // Next 90 days
+        toDate = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
       } else if (context.timeframe === 'recent') {
-        fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000); // Last 90 days
+        fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
         toDate = today;
       } else {
         fromDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
@@ -64,7 +117,6 @@ export const ipoResearchTool = createTool({
       const fromStr = fromDate.toISOString().split('T')[0];
       const toStr = toDate.toISOString().split('T')[0];
 
-      // Fetch IPO calendar from Finnhub
       const url = `https://finnhub.io/api/v1/calendar/ipo?from=${fromStr}&to=${toStr}&token=${apiKey}`;
       console.log(`🔍 Fetching from: ${url}`);
       
@@ -81,7 +133,6 @@ export const ipoResearchTool = createTool({
       
       console.log(`✅ Fetched ${allIPOs.length} IPOs`);
 
-      // Filter by company name if provided
       let filteredIPOs = allIPOs;
       if (context.companyName && context.companyName.toLowerCase() !== 'all') {
         const searchTerm = context.companyName.toLowerCase();
@@ -110,7 +161,6 @@ export const ipoResearchTool = createTool({
         };
       }
 
-      // Format IPO details
       const ipoDetails = (context.companyName ? filteredIPOs : filteredIPOs.slice(0, 10)).map((ipo: any) => ({
         name: ipo.name,
         symbol: ipo.symbol || 'TBA',
@@ -126,7 +176,6 @@ export const ipoResearchTool = createTool({
       
       let findings = '';
       if (context.companyName && filteredIPOs.length === 1) {
-        // Specific company found
         findings = `**${mainIPO.name} (${mainIPO.symbol})**
 
 📊 **IPO Details:**
@@ -144,7 +193,6 @@ export const ipoResearchTool = createTool({
 ✓ Research promoter background and business model
 ✓ Monitor subscription numbers when available`;
       } else {
-        // Show calendar of multiple IPOs
         findings = `**${context.timeframe.toUpperCase()} IPO CALENDAR**
 
 Found ${ipoDetails.length} IPOs:\n\n` + ipoDetails.map((ipo: any, idx: number) => 
@@ -182,7 +230,7 @@ Found ${ipoDetails.length} IPOs:\n\n` + ipoDetails.map((ipo: any, idx: number) =
 });
 
 // ============================================================================
-// PORTFOLIO PROFIT CALCULATOR - ACTUALLY CALCULATES NOW!
+// PORTFOLIO PROFIT CALCULATOR
 // ============================================================================
 
 export const portfolioProfitCalculatorTool = createTool({
@@ -265,7 +313,6 @@ export const portfolioProfitCalculatorTool = createTool({
       const totalProfit = totalValue - totalCost;
       const totalProfitPercent = (totalProfit / totalCost) * 100;
 
-      // Generate summary
       const winners = holdings.filter(h => h.profitLoss > 0);
       const losers = holdings.filter(h => h.profitLoss < 0);
       
