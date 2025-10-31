@@ -2,6 +2,8 @@
 
 **Nosana Builders Challenge #3 Submission**
 
+[Video Link](https://www.loom.com/share/e14861d88be0422eb3dc77fbd697f242)
+
 ## 🎯 Project Overview
 
 FinanceAI is an intelligent AI agent that helps users make informed investment decisions through comprehensive stock research, real-time portfolio analysis, and automated financial tracking. Built with Mastra framework and deployed on Nosana's decentralized network.
@@ -60,9 +62,9 @@ FinanceAI serves as your personal financial analyst, providing:
 ## 🚀 Live Demo
 
 **Deployed on Nosana Network**
-- Demo Video: [YouTube Link](#)
+- Demo Video: [Video Link](https://www.loom.com/share/e14861d88be0422eb3dc77fbd697f242)
 - Docker Image: `pranav1100/financeai:latest`
-- Live URL: [Your Nosana Deployment URL](#)
+- Live URL: [Nosana Deployment URL](#)
 
 
 ## 🎮 How to Use
@@ -105,7 +107,7 @@ FinanceAI serves as your personal financial analyst, providing:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR-USERNAME/agent-challenge
+git clone https://github.com/pranav-1100/agent-challenge
 cd agent-challenge
 
 # Install dependencies
