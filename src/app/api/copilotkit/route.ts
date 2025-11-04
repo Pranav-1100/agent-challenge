@@ -13,18 +13,21 @@ const serviceAdapter = new ExperimentalEmptyAdapter();
 // Helper function to add CORS headers
 function getCorsHeaders(origin: string | null) {
   // Allow requests from Vercel frontend and backend
+  // Must match the allowed origins in backend-server.mjs
   const allowedOrigins = [
     'https://agent-challenge-iota.vercel.app',
     'https://agents-backend.trou.hackclub.app',
+    'http://localhost:3000',
     process.env.FRONTEND_URL,
-    process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
 
   // Check if the request origin is in our allowed list
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  const isAllowed = origin && allowedOrigins.some(allowed =>
+    origin.includes(allowed) || allowed === origin
+  );
 
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://agent-challenge-iota.vercel.app',
+    'Access-Control-Allow-Origin': isAllowed && origin ? origin : allowedOrigins[0],
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin, DNT, User-Agent, X-CSRF-Token',
     'Access-Control-Allow-Credentials': 'true',
