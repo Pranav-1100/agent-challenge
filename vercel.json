@@ -1,0 +1,30 @@
+{
+  "buildCommand": "pnpm run build:ui",
+  "devCommand": "pnpm run dev:ui",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_BACKEND_URL": "@backend-url",
+    "NEXT_PUBLIC_FINNHUB_API_KEY": "@finnhub-api-key",
+    "NEXT_PUBLIC_NEWS_API_KEY": "@news-api-key"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ]
+}
