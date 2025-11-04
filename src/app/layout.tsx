@@ -24,10 +24,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Use backend URL from environment variable, fallback to local API route for development
+  const runtimeUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "/api/copilotkit";
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-      <CopilotKit runtimeUrl="/api/copilotkit" agent="financeAgent">
+        <CopilotKit runtimeUrl={runtimeUrl} agent="financeAgent">
           {children}
         </CopilotKit>
       </body>

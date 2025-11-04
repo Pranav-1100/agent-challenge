@@ -6,10 +6,13 @@
     "dev:agent": "mastra dev",
     "dev:ui": "next dev --turbopack",
     "dev:debug": "LOG_LEVEL=debug npm run dev",
+    "dev:backend": "NODE_ENV=development node backend-server.mjs",
     "build:ui": "next build",
     "start:ui": "next start",
     "build:agent": "mastra build",
+    "build:backend": "mastra build",
     "start:agent": "mastra start",
+    "start:backend": "NODE_ENV=production node backend-server.mjs",
     "lint": "next lint",
     "build": "mastra build && next build",
     "start": "concurrently \"npm:start:agent\" \"npm:start:ui\""
